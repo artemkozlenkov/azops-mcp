@@ -1,0 +1,73 @@
+[project]
+name = "azops-mcp"
+version = "0.1.0"
+description = "Azure Infrastructure MCP Server"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp[cli]>=1.2.0",
+    "httpx>=0.27.0",
+    "pydantic>=2.0.0",
+    "python-dotenv>=1.0.0",
+    # Azure SDK - core dependencies
+    "azure-identity>=1.15.0",
+    "azure-mgmt-compute>=30.0.0",
+    "azure-mgmt-resource>=23.0.0",
+    "azure-mgmt-storage>=21.0.0",
+    "azure-mgmt-subscription>=3.1.0",
+    "azure-mgmt-managementgroups>=1.0.0",
+    "six>=1.16.0",  # Required by azure-mgmt-managementgroups
+    "azure-mgmt-authorization>=4.0.0",
+    "azure-mgmt-monitor>=6.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.12.0",
+    "black>=23.12.0",
+    "ruff>=0.1.0",
+    "mypy>=1.7.0",
+]
+monitoring = [
+    "psutil>=5.9.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.12.0",
+    "black>=23.12.0",
+    "ruff>=0.1.0",
+    "mypy>=1.7.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+
+[tool.black]
+line-length = 120
+target-version = ["py310"]
+
+[tool.ruff]
+line-length = 120
+select = ["E", "F", "W", "I", "N", "B", "C4"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_ignores = true
+disallow_untyped_defs = true

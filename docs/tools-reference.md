@@ -22,8 +22,20 @@ Complete reference for all tools exposed by azops-mcp.
 
 | Badge | Meaning |
 |:------|:--------|
-| **Free** | Available without `AUTH_TOKEN` |
-| **Paid** | Requires `AUTH_TOKEN` in `.env` |
+| **Free** | Always registered — no license needed |
+| **Premium** | Only registered when the license server grants the matching feature flag. Invisible without a valid `AUTH_TOKEN`. |
+
+### Feature Flags
+
+Premium tools are grouped by feature flag. The license server returns which flags are granted for a given token.
+
+| Flag | Controls |
+|:-----|:---------|
+| `rg_write` | `create_resource_group`, `delete_resource_group` |
+| `rbac` | `list_role_assignments` |
+| `locks_write` | `create_resource_lock`, `delete_resource_lock` |
+| `tags_write` | `set_resource_group_tags` |
+| `mg_write` | `create_management_group`, `delete_management_group` |
 
 ---
 
@@ -37,9 +49,9 @@ Check MCP server health and Azure SDK availability.
 |:--|:--|
 | **Tier** | Free |
 | **Parameters** | None |
-| **Returns** | JSON dict with `status`, `dependencies`, `timestamp`, `version` |
+| **Returns** | JSON dict with `status`, `dependencies`, `license_tier`, `timestamp`, `version` |
 
-Reports which Azure SDK packages are installed (`ok` or `missing`).
+Reports which Azure SDK packages are installed (`ok` or `missing`) and the current license tier (`free` or `pro`).
 
 ---
 
@@ -131,7 +143,7 @@ Create a new management group.
 
 | | |
 |:--|:--|
-| **Tier** | Free |
+| **Tier** | **Premium** (`mg_write`) |
 | **Parameters** | `group_id` (str, required), `display_name` (str, required), `parent_id` (str, optional) |
 | **Returns** | Created group details |
 
@@ -143,7 +155,7 @@ Delete a management group. Must be empty (no children).
 
 | | |
 |:--|:--|
-| **Tier** | Free |
+| **Tier** | **Premium** (`mg_write`) |
 | **Parameters** | `group_id` (str, required) |
 | **Returns** | Success confirmation |
 
@@ -157,7 +169,7 @@ List role assignments (RBAC) for subscription or resource group.
 
 | | |
 |:--|:--|
-| **Tier** | **Paid** |
+| **Tier** | **Premium** (`rbac`) |
 | **Parameters** | `resource_group` (str, optional) — scope filter |
 | **Returns** | Principal IDs, types, role definition IDs, scopes (max 20) |
 
@@ -191,7 +203,7 @@ Create a lock on a resource group to prevent deletion or modification.
 
 | | |
 |:--|:--|
-| **Tier** | **Paid** |
+| **Tier** | **Premium** (`locks_write`) |
 | **Parameters** | `resource_group` (str, required), `lock_name` (str, required), `lock_level` (str, default `"CanNotDelete"`) |
 | **Returns** | Created lock details |
 
@@ -203,7 +215,7 @@ Delete a resource lock from a resource group.
 
 | | |
 |:--|:--|
-| **Tier** | **Paid** |
+| **Tier** | **Premium** (`locks_write`) |
 | **Parameters** | `resource_group` (str, required), `lock_name` (str, required) |
 | **Returns** | Success confirmation |
 
@@ -227,7 +239,7 @@ Set tags on a resource group. Merges with existing tags.
 
 | | |
 |:--|:--|
-| **Tier** | **Paid** |
+| **Tier** | **Premium** (`tags_write`) |
 | **Parameters** | `resource_group` (str, required), `tags` (str, required) — format: `key1=value1,key2=value2` |
 | **Returns** | Updated tag list |
 
@@ -242,7 +254,7 @@ Get recent Azure activity log (audit log).
 | | |
 |:--|:--|
 | **Tier** | Free |
-| **Parameters** | `resource_group` (str, optional), `days` (int, default `1`, range 1–7) |
+| **Parameters** | `resource_group` (str, optional), `days` (int, default `1`, range 1-7) |
 | **Returns** | Timestamps, operations, statuses, and callers (max 20 entries) |
 
 Uses the Azure Monitor SDK to query the activity log.
@@ -267,7 +279,7 @@ Create a new Azure resource group.
 
 | | |
 |:--|:--|
-| **Tier** | **Paid** |
+| **Tier** | **Premium** (`rg_write`) |
 | **Parameters** | `name` (str, required), `location` (str, required) |
 | **Returns** | Created group details including resource ID |
 
@@ -277,7 +289,7 @@ Delete a resource group and ALL its resources. Irreversible.
 
 | | |
 |:--|:--|
-| **Tier** | **Paid** |
+| **Tier** | **Premium** (`rg_write`) |
 | **Parameters** | `name` (str, required) |
 | **Returns** | Success confirmation |
 

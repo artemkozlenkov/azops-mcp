@@ -1,53 +1,54 @@
 #!/usr/bin/env python3
-"""Azure Infrastructure MCP Server - Core platform tools for Azure management."""
+"""Azure Infrastructure MCP Server - Core platform tools for Azure management.
+
+Tools are split into two tiers:
+
+  FREE   — read-only / operational tools, always registered.
+  PREMIUM — write / mutating tools, registered only when the license
+            server grants the corresponding feature flag.
+
+On startup the server validates AUTH_TOKEN against LICENSE_API_URL.
+If validation fails (or no token is set), only free-tier tools appear
+in the MCP ``tools/list`` response — premium tools are invisible.
+"""
 
 import logging
-import sys
 import signal
+import sys
 from datetime import datetime
 from typing import Any, Dict, Optional
 
 from mcp.server.fastmcp import FastMCP
 
-from .tools import cloud
 from .config import config
-from .utils.auth import is_paywall_enabled, check_auth_token
+from .tools import cloud
+from .utils.auth import get_licensed_features, validate_license
 
-# Configure logging
+# ---------------------------------------------------------------------------
+# Logging
+# ---------------------------------------------------------------------------
+
 logging.basicConfig(
     level=config.get_log_level(),
     format=config.log_format,
     stream=sys.stderr,
 )
-
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# MCP instance
+# ---------------------------------------------------------------------------
+
 mcp = FastMCP("azops-mcp")
 
 
 # =============================================================================
-# PAYWALL HELPER FUNCTIONS
+# FREE TIER — always registered
 # =============================================================================
 
-def _check_paywall_access() -> Optional[str]:
-    """Check if paywall access is granted. Returns error message if not, None if allowed."""
-    if not is_paywall_enabled():
-        return (
-            "Access denied: AUTH_TOKEN not configured. "
-            "Set AUTH_TOKEN in .env to use this feature. "
-            "Free tier tools (read-only operations) are still available."
-        )
-    is_valid, error_msg = check_auth_token()
-    if not is_valid:
-        return (
-            f"Access denied: {error_msg} "
-            "Set a valid AUTH_TOKEN in .env to use this feature."
-        )
-    return None
 
+# -- 1. Health & Status -------------------------------------------------------
 
-# =============================================================================
-# 1. HEALTH & STATUS
-# =============================================================================
 
 @mcp.tool()
 async def health_check() -> Dict[str, Any]:
@@ -68,9 +69,11 @@ async def health_check() -> Dict[str, Any]:
             except ImportError:
                 deps[pkg] = "missing"
 
+        license_info = validate_license()
         return {
             "status": "healthy",
             "dependencies": deps,
+            "license_tier": license_info.get("tier", "free"),
             "timestamp": datetime.now().isoformat(),
             "version": "1.0.0",
         }
@@ -78,9 +81,8 @@ async def health_check() -> Dict[str, Any]:
         return {"status": "unhealthy", "error": str(e)}
 
 
-# =============================================================================
-# 2. SUBSCRIPTION & AUTHENTICATION (5 tools)
-# =============================================================================
+# -- 2. Subscription & Authentication -----------------------------------------
+
 
 @mcp.tool()
 async def list_subscriptions() -> str:
@@ -89,8 +91,8 @@ async def list_subscriptions() -> str:
     try:
         return await cloud.list_subscriptions()
     except Exception as e:
-        logger.error(f"list_subscriptions failed: {e}")
-        return f"Error: {str(e)}"
+        logger.error("list_subscriptions failed: %s", e)
+        return f"Error: {e}"
 
 
 @mcp.tool()
@@ -100,14 +102,14 @@ async def set_subscription(subscription_id: str) -> str:
     Args:
         subscription_id: Azure subscription ID (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
     """
-    logger.info(f"set_subscription: {subscription_id}")
+    logger.info("set_subscription: %s", subscription_id)
     if not subscription_id:
         return "Error: subscription_id is required"
     try:
         return await cloud.configure_subscription(subscription_id)
     except Exception as e:
-        logger.error(f"set_subscription failed: {e}")
-        return f"Error: {str(e)}"
+        logger.error("set_subscription failed: %s", e)
+        return f"Error: {e}"
 
 
 @mcp.tool()
@@ -117,8 +119,8 @@ async def auth_status() -> str:
     try:
         return await cloud.get_auth_status()
     except Exception as e:
-        logger.error(f"auth_status failed: {e}")
-        return f"Error: {str(e)}"
+        logger.error("auth_status failed: %s", e)
+        return f"Error: {e}"
 
 
 @mcp.tool()
@@ -128,8 +130,8 @@ async def list_locations() -> str:
     try:
         return await cloud.list_locations()
     except Exception as e:
-        logger.error(f"list_locations failed: {e}")
-        return f"Error: {str(e)}"
+        logger.error("list_locations failed: %s", e)
+        return f"Error: {e}"
 
 
 @mcp.tool()
@@ -139,13 +141,12 @@ async def list_tenants() -> str:
     try:
         return await cloud.get_tenant_info()
     except Exception as e:
-        logger.error(f"list_tenants failed: {e}")
-        return f"Error: {str(e)}"
+        logger.error("list_tenants failed: %s", e)
+        return f"Error: {e}"
 
 
-# =============================================================================
-# 3. MANAGEMENT GROUPS (4 tools)
-# =============================================================================
+# -- 3. Management Groups (read) ----------------------------------------------
+
 
 @mcp.tool()
 async def list_management_groups() -> str:
@@ -154,8 +155,8 @@ async def list_management_groups() -> str:
     try:
         return await cloud.list_management_groups()
     except Exception as e:
-        logger.error(f"list_management_groups failed: {e}")
-        return f"Error: {str(e)}"
+        logger.error("list_management_groups failed: %s", e)
+        return f"Error: {e}"
 
 
 @mcp.tool()
@@ -165,74 +166,17 @@ async def get_management_group(group_id: str) -> str:
     Args:
         group_id: Management group ID
     """
-    logger.info(f"get_management_group: {group_id}")
+    logger.info("get_management_group: %s", group_id)
     if not group_id:
         return "Error: group_id is required"
     try:
         return await cloud.get_management_group(group_id)
     except Exception as e:
-        logger.error(f"get_management_group failed: {e}")
-        return f"Error: {str(e)}"
+        logger.error("get_management_group failed: %s", e)
+        return f"Error: {e}"
 
 
-@mcp.tool()
-async def create_management_group(group_id: str, display_name: str, parent_id: str = "") -> str:
-    """Create a new management group.
-
-    Args:
-        group_id: Unique ID for the management group
-        display_name: Display name
-        parent_id: Optional parent management group ID
-    """
-    logger.info(f"create_management_group: {group_id}")
-    if not group_id or not display_name:
-        return "Error: group_id and display_name are required"
-    try:
-        parent = parent_id if parent_id else None
-        return await cloud.create_management_group(group_id, display_name, parent)
-    except Exception as e:
-        logger.error(f"create_management_group failed: {e}")
-        return f"Error: {str(e)}"
-
-
-@mcp.tool()
-async def delete_management_group(group_id: str) -> str:
-    """Delete a management group (must be empty).
-
-    Args:
-        group_id: Management group ID to delete
-    """
-    logger.info(f"delete_management_group: {group_id}")
-    if not group_id:
-        return "Error: group_id is required"
-    try:
-        return await cloud.delete_management_group(group_id)
-    except Exception as e:
-        logger.error(f"delete_management_group failed: {e}")
-        return f"Error: {str(e)}"
-
-
-# =============================================================================
-# 4. RBAC - ROLE ASSIGNMENTS (2 tools)
-# =============================================================================
-
-@mcp.tool()
-async def list_role_assignments(resource_group: str = "") -> str:
-    """List role assignments (RBAC) for subscription or resource group (paywall feature).
-
-    Args:
-        resource_group: Optional resource group to filter by
-    """
-    logger.info(f"list_role_assignments: {resource_group or 'subscription'}")
-    paywall_error = _check_paywall_access()
-    if paywall_error:
-        return paywall_error
-    try:
-        rg = resource_group if resource_group else None
-        return await cloud.list_role_assignments(rg)
-    except Exception as e:
-        logger.error(f"list_role_assignments failed: {e}")
-        return f"Error: {str(e)}"
+# -- 4. RBAC (read) -----------------------------------------------------------
 
 
 @mcp.tool()
@@ -242,13 +186,12 @@ async def list_role_definitions() -> str:
     try:
         return await cloud.list_role_definitions()
     except Exception as e:
-        logger.error(f"list_role_definitions failed: {e}")
-        return f"Error: {str(e)}"
+        logger.error("list_role_definitions failed: %s", e)
+        return f"Error: {e}"
 
 
-# =============================================================================
-# 5. RESOURCE LOCKS (3 tools)
-# =============================================================================
+# -- 5. Resource Locks (read) -------------------------------------------------
+
 
 @mcp.tool()
 async def list_resource_locks(resource_group: str = "") -> str:
@@ -257,61 +200,17 @@ async def list_resource_locks(resource_group: str = "") -> str:
     Args:
         resource_group: Optional resource group to filter by
     """
-    logger.info(f"list_resource_locks: {resource_group or 'subscription'}")
+    logger.info("list_resource_locks: %s", resource_group or "subscription")
     try:
         rg = resource_group if resource_group else None
         return await cloud.list_resource_locks(rg)
     except Exception as e:
-        logger.error(f"list_resource_locks failed: {e}")
-        return f"Error: {str(e)}"
+        logger.error("list_resource_locks failed: %s", e)
+        return f"Error: {e}"
 
 
-@mcp.tool()
-async def create_resource_lock(resource_group: str, lock_name: str, lock_level: str = "CanNotDelete") -> str:
-    """Create a lock on a resource group to prevent deletion or modification (paywall feature).
+# -- 6. Tags (read) -----------------------------------------------------------
 
-    Args:
-        resource_group: Resource group to lock
-        lock_name: Name for the lock
-        lock_level: CanNotDelete (default) or ReadOnly
-    """
-    logger.info(f"create_resource_lock: {resource_group}/{lock_name}")
-    if not resource_group or not lock_name:
-        return "Error: resource_group and lock_name are required"
-    paywall_error = _check_paywall_access()
-    if paywall_error:
-        return paywall_error
-    try:
-        return await cloud.create_resource_lock(resource_group, lock_name, lock_level)
-    except Exception as e:
-        logger.error(f"create_resource_lock failed: {e}")
-        return f"Error: {str(e)}"
-
-
-@mcp.tool()
-async def delete_resource_lock(resource_group: str, lock_name: str) -> str:
-    """Delete a resource lock from a resource group (paywall feature).
-
-    Args:
-        resource_group: Resource group containing the lock
-        lock_name: Name of the lock to delete
-    """
-    logger.info(f"delete_resource_lock: {resource_group}/{lock_name}")
-    if not resource_group or not lock_name:
-        return "Error: resource_group and lock_name are required"
-    paywall_error = _check_paywall_access()
-    if paywall_error:
-        return paywall_error
-    try:
-        return await cloud.delete_resource_lock(resource_group, lock_name)
-    except Exception as e:
-        logger.error(f"delete_resource_lock failed: {e}")
-        return f"Error: {str(e)}"
-
-
-# =============================================================================
-# 6. TAGS (2 tools)
-# =============================================================================
 
 @mcp.tool()
 async def list_tags(resource_group: str = "") -> str:
@@ -320,49 +219,17 @@ async def list_tags(resource_group: str = "") -> str:
     Args:
         resource_group: Optional resource group to get tags from
     """
-    logger.info(f"list_tags: {resource_group or 'subscription'}")
+    logger.info("list_tags: %s", resource_group or "subscription")
     try:
         rg = resource_group if resource_group else None
         return await cloud.list_tags(rg)
     except Exception as e:
-        logger.error(f"list_tags failed: {e}")
-        return f"Error: {str(e)}"
+        logger.error("list_tags failed: %s", e)
+        return f"Error: {e}"
 
 
-@mcp.tool()
-async def set_resource_group_tags(resource_group: str, tags: str) -> str:
-    """Set tags on a resource group (paywall feature). Format: key1=value1,key2=value2
+# -- 7. Activity Log ----------------------------------------------------------
 
-    Args:
-        resource_group: Resource group to tag
-        tags: Tags in format key1=value1,key2=value2
-    """
-    logger.info(f"set_resource_group_tags: {resource_group}")
-    if not resource_group or not tags:
-        return "Error: resource_group and tags are required"
-    paywall_error = _check_paywall_access()
-    if paywall_error:
-        return paywall_error
-    try:
-        # Parse tags string
-        tag_dict = {}
-        for pair in tags.split(","):
-            if "=" in pair:
-                k, v = pair.split("=", 1)
-                tag_dict[k.strip()] = v.strip()
-
-        if not tag_dict:
-            return "Error: Invalid tags format. Use key1=value1,key2=value2"
-
-        return await cloud.update_resource_group_tags(resource_group, tag_dict, merge=True)
-    except Exception as e:
-        logger.error(f"set_resource_group_tags failed: {e}")
-        return f"Error: {str(e)}"
-
-
-# =============================================================================
-# 7. ACTIVITY LOG (1 tool)
-# =============================================================================
 
 @mcp.tool()
 async def get_activity_log(resource_group: str = "", days: int = 1) -> str:
@@ -372,18 +239,17 @@ async def get_activity_log(resource_group: str = "", days: int = 1) -> str:
         resource_group: Optional resource group to filter by
         days: Days to look back (1-7, default 1)
     """
-    logger.info(f"get_activity_log: {resource_group or 'subscription'}, days={days}")
+    logger.info("get_activity_log: %s, days=%d", resource_group or "subscription", days)
     try:
         rg = resource_group if resource_group else None
         return await cloud.get_activity_log(rg, days)
     except Exception as e:
-        logger.error(f"get_activity_log failed: {e}")
-        return f"Error: {str(e)}"
+        logger.error("get_activity_log failed: %s", e)
+        return f"Error: {e}"
 
 
-# =============================================================================
-# 8. RESOURCE GROUPS (3 tools)
-# =============================================================================
+# -- 8. Resource Groups (read) ------------------------------------------------
+
 
 @mcp.tool()
 async def list_resource_groups() -> str:
@@ -392,49 +258,8 @@ async def list_resource_groups() -> str:
     try:
         return await cloud.list_resource_groups()
     except Exception as e:
-        logger.error(f"list_resource_groups failed: {e}")
-        return f"Error: {str(e)}"
-
-
-@mcp.tool()
-async def create_resource_group(name: str, location: str) -> str:
-    """Create a new Azure resource group (paywall feature).
-
-    Args:
-        name: Resource group name (e.g., my-app-rg)
-        location: Azure region (e.g., eastus, westeurope)
-    """
-    logger.info(f"create_resource_group: {name} in {location}")
-    if not name or not location:
-        return "Error: name and location are required"
-    paywall_error = _check_paywall_access()
-    if paywall_error:
-        return paywall_error
-    try:
-        return await cloud.create_resource_group(name, location)
-    except Exception as e:
-        logger.error(f"create_resource_group failed: {e}")
-        return f"Error: {str(e)}"
-
-
-@mcp.tool()
-async def delete_resource_group(name: str) -> str:
-    """Delete a resource group and ALL its resources. WARNING: Irreversible! (paywall feature).
-
-    Args:
-        name: Resource group name to delete
-    """
-    logger.info(f"delete_resource_group: {name}")
-    if not name:
-        return "Error: name is required"
-    paywall_error = _check_paywall_access()
-    if paywall_error:
-        return paywall_error
-    try:
-        return await cloud.delete_resource_group(name)
-    except Exception as e:
-        logger.error(f"delete_resource_group failed: {e}")
-        return f"Error: {str(e)}"
+        logger.error("list_resource_groups failed: %s", e)
+        return f"Error: {e}"
 
 
 @mcp.tool()
@@ -445,19 +270,18 @@ async def list_resources(resource_group: str, resource_type: str = "all") -> str
         resource_group: Resource group name
         resource_type: Filter by type (all, vm, storage)
     """
-    logger.info(f"list_resources: {resource_group}, type={resource_type}")
+    logger.info("list_resources: %s, type=%s", resource_group, resource_type)
     if not resource_group:
         return "Error: resource_group is required"
     try:
         return await cloud.list_resources(resource_group, resource_type)
     except Exception as e:
-        logger.error(f"list_resources failed: {e}")
-        return f"Error: {str(e)}"
+        logger.error("list_resources failed: %s", e)
+        return f"Error: {e}"
 
 
-# =============================================================================
-# 9. VIRTUAL MACHINES (7 tools)
-# =============================================================================
+# -- 9. Virtual Machines -------------------------------------------------------
+
 
 @mcp.tool()
 async def list_vms(resource_group: str) -> str:
@@ -466,14 +290,14 @@ async def list_vms(resource_group: str) -> str:
     Args:
         resource_group: Resource group name
     """
-    logger.info(f"list_vms: {resource_group}")
+    logger.info("list_vms: %s", resource_group)
     if not resource_group:
         return "Error: resource_group is required"
     try:
         return await cloud.list_resources(resource_group, "vm")
     except Exception as e:
-        logger.error(f"list_vms failed: {e}")
-        return f"Error: {str(e)}"
+        logger.error("list_vms failed: %s", e)
+        return f"Error: {e}"
 
 
 @mcp.tool()
@@ -484,14 +308,14 @@ async def get_vm_status(resource_group: str, vm_name: str) -> str:
         resource_group: Resource group name
         vm_name: Virtual machine name
     """
-    logger.info(f"get_vm_status: {resource_group}/{vm_name}")
+    logger.info("get_vm_status: %s/%s", resource_group, vm_name)
     if not resource_group or not vm_name:
         return "Error: resource_group and vm_name are required"
     try:
         return await cloud.get_resource_status(resource_group, vm_name, "vm")
     except Exception as e:
-        logger.error(f"get_vm_status failed: {e}")
-        return f"Error: {str(e)}"
+        logger.error("get_vm_status failed: %s", e)
+        return f"Error: {e}"
 
 
 @mcp.tool()
@@ -502,14 +326,14 @@ async def start_vm(resource_group: str, vm_name: str) -> str:
         resource_group: Resource group name
         vm_name: Virtual machine name
     """
-    logger.info(f"start_vm: {resource_group}/{vm_name}")
+    logger.info("start_vm: %s/%s", resource_group, vm_name)
     if not resource_group or not vm_name:
         return "Error: resource_group and vm_name are required"
     try:
         return await cloud.manage_vm(resource_group, vm_name, "start")
     except Exception as e:
-        logger.error(f"start_vm failed: {e}")
-        return f"Error: {str(e)}"
+        logger.error("start_vm failed: %s", e)
+        return f"Error: {e}"
 
 
 @mcp.tool()
@@ -520,14 +344,14 @@ async def stop_vm(resource_group: str, vm_name: str) -> str:
         resource_group: Resource group name
         vm_name: Virtual machine name
     """
-    logger.info(f"stop_vm: {resource_group}/{vm_name}")
+    logger.info("stop_vm: %s/%s", resource_group, vm_name)
     if not resource_group or not vm_name:
         return "Error: resource_group and vm_name are required"
     try:
         return await cloud.manage_vm(resource_group, vm_name, "stop")
     except Exception as e:
-        logger.error(f"stop_vm failed: {e}")
-        return f"Error: {str(e)}"
+        logger.error("stop_vm failed: %s", e)
+        return f"Error: {e}"
 
 
 @mcp.tool()
@@ -538,14 +362,14 @@ async def restart_vm(resource_group: str, vm_name: str) -> str:
         resource_group: Resource group name
         vm_name: Virtual machine name
     """
-    logger.info(f"restart_vm: {resource_group}/{vm_name}")
+    logger.info("restart_vm: %s/%s", resource_group, vm_name)
     if not resource_group or not vm_name:
         return "Error: resource_group and vm_name are required"
     try:
         return await cloud.manage_vm(resource_group, vm_name, "restart")
     except Exception as e:
-        logger.error(f"restart_vm failed: {e}")
-        return f"Error: {str(e)}"
+        logger.error("restart_vm failed: %s", e)
+        return f"Error: {e}"
 
 
 @mcp.tool()
@@ -556,14 +380,14 @@ async def deallocate_vm(resource_group: str, vm_name: str) -> str:
         resource_group: Resource group name
         vm_name: Virtual machine name
     """
-    logger.info(f"deallocate_vm: {resource_group}/{vm_name}")
+    logger.info("deallocate_vm: %s/%s", resource_group, vm_name)
     if not resource_group or not vm_name:
         return "Error: resource_group and vm_name are required"
     try:
         return await cloud.manage_vm(resource_group, vm_name, "deallocate")
     except Exception as e:
-        logger.error(f"deallocate_vm failed: {e}")
-        return f"Error: {str(e)}"
+        logger.error("deallocate_vm failed: %s", e)
+        return f"Error: {e}"
 
 
 @mcp.tool()
@@ -575,7 +399,7 @@ async def scale_vmss(resource_group: str, vmss_name: str, capacity: int) -> str:
         vmss_name: VM Scale Set name
         capacity: Target instance count (0+)
     """
-    logger.info(f"scale_vmss: {resource_group}/{vmss_name} to {capacity}")
+    logger.info("scale_vmss: %s/%s to %d", resource_group, vmss_name, capacity)
     if not resource_group or not vmss_name:
         return "Error: resource_group and vmss_name are required"
     if not isinstance(capacity, int) or capacity < 0:
@@ -583,13 +407,12 @@ async def scale_vmss(resource_group: str, vmss_name: str, capacity: int) -> str:
     try:
         return await cloud.scale_vmss(resource_group, vmss_name, capacity)
     except Exception as e:
-        logger.error(f"scale_vmss failed: {e}")
-        return f"Error: {str(e)}"
+        logger.error("scale_vmss failed: %s", e)
+        return f"Error: {e}"
 
 
-# =============================================================================
-# 10. STORAGE ACCOUNTS (2 tools)
-# =============================================================================
+# -- 10. Storage Accounts -----------------------------------------------------
+
 
 @mcp.tool()
 async def list_storage_accounts(resource_group: str) -> str:
@@ -598,14 +421,14 @@ async def list_storage_accounts(resource_group: str) -> str:
     Args:
         resource_group: Resource group name
     """
-    logger.info(f"list_storage_accounts: {resource_group}")
+    logger.info("list_storage_accounts: %s", resource_group)
     if not resource_group:
         return "Error: resource_group is required"
     try:
         return await cloud.list_resources(resource_group, "storage")
     except Exception as e:
-        logger.error(f"list_storage_accounts failed: {e}")
-        return f"Error: {str(e)}"
+        logger.error("list_storage_accounts failed: %s", e)
+        return f"Error: {e}"
 
 
 @mcp.tool()
@@ -616,26 +439,214 @@ async def get_storage_status(resource_group: str, account_name: str) -> str:
         resource_group: Resource group name
         account_name: Storage account name
     """
-    logger.info(f"get_storage_status: {resource_group}/{account_name}")
+    logger.info("get_storage_status: %s/%s", resource_group, account_name)
     if not resource_group or not account_name:
         return "Error: resource_group and account_name are required"
     try:
         return await cloud.get_resource_status(resource_group, account_name, "storage")
     except Exception as e:
-        logger.error(f"get_storage_status failed: {e}")
-        return f"Error: {str(e)}"
+        logger.error("get_storage_status failed: %s", e)
+        return f"Error: {e}"
+
+
+# =============================================================================
+# PREMIUM TIER — conditionally registered based on license features
+# =============================================================================
+
+
+def _register_premium_tools() -> None:
+    """Register premium tools whose feature flags are present in the license.
+
+    Called once at module-load time.  If the license server is unreachable
+    or the token is invalid, no premium tools are registered and the MCP
+    client never sees them.
+    """
+    features = get_licensed_features()
+
+    if not features:
+        logger.info("No premium features licensed — only free-tier tools available")
+        return
+
+    logger.info("Registering premium tools for features: %s", features)
+
+    # -- Resource Groups (write) -----------------------------------------------
+
+    if "rg_write" in features:
+
+        @mcp.tool()
+        async def create_resource_group(name: str, location: str) -> str:
+            """Create a new Azure resource group.
+
+            Args:
+                name: Resource group name (e.g., my-app-rg)
+                location: Azure region (e.g., eastus, westeurope)
+            """
+            logger.info("create_resource_group: %s in %s", name, location)
+            if not name or not location:
+                return "Error: name and location are required"
+            try:
+                return await cloud.create_resource_group(name, location)
+            except Exception as e:
+                logger.error("create_resource_group failed: %s", e)
+                return f"Error: {e}"
+
+        @mcp.tool()
+        async def delete_resource_group(name: str) -> str:
+            """Delete a resource group and ALL its resources. WARNING: Irreversible!
+
+            Args:
+                name: Resource group name to delete
+            """
+            logger.info("delete_resource_group: %s", name)
+            if not name:
+                return "Error: name is required"
+            try:
+                return await cloud.delete_resource_group(name)
+            except Exception as e:
+                logger.error("delete_resource_group failed: %s", e)
+                return f"Error: {e}"
+
+    # -- RBAC ------------------------------------------------------------------
+
+    if "rbac" in features:
+
+        @mcp.tool()
+        async def list_role_assignments(resource_group: str = "") -> str:
+            """List role assignments (RBAC) for subscription or resource group.
+
+            Args:
+                resource_group: Optional resource group to filter by
+            """
+            logger.info("list_role_assignments: %s", resource_group or "subscription")
+            try:
+                rg = resource_group if resource_group else None
+                return await cloud.list_role_assignments(rg)
+            except Exception as e:
+                logger.error("list_role_assignments failed: %s", e)
+                return f"Error: {e}"
+
+    # -- Resource Locks (write) ------------------------------------------------
+
+    if "locks_write" in features:
+
+        @mcp.tool()
+        async def create_resource_lock(resource_group: str, lock_name: str, lock_level: str = "CanNotDelete") -> str:
+            """Create a lock on a resource group to prevent deletion or modification.
+
+            Args:
+                resource_group: Resource group to lock
+                lock_name: Name for the lock
+                lock_level: CanNotDelete (default) or ReadOnly
+            """
+            logger.info("create_resource_lock: %s/%s", resource_group, lock_name)
+            if not resource_group or not lock_name:
+                return "Error: resource_group and lock_name are required"
+            try:
+                return await cloud.create_resource_lock(resource_group, lock_name, lock_level)
+            except Exception as e:
+                logger.error("create_resource_lock failed: %s", e)
+                return f"Error: {e}"
+
+        @mcp.tool()
+        async def delete_resource_lock(resource_group: str, lock_name: str) -> str:
+            """Delete a resource lock from a resource group.
+
+            Args:
+                resource_group: Resource group containing the lock
+                lock_name: Name of the lock to delete
+            """
+            logger.info("delete_resource_lock: %s/%s", resource_group, lock_name)
+            if not resource_group or not lock_name:
+                return "Error: resource_group and lock_name are required"
+            try:
+                return await cloud.delete_resource_lock(resource_group, lock_name)
+            except Exception as e:
+                logger.error("delete_resource_lock failed: %s", e)
+                return f"Error: {e}"
+
+    # -- Tags (write) ----------------------------------------------------------
+
+    if "tags_write" in features:
+
+        @mcp.tool()
+        async def set_resource_group_tags(resource_group: str, tags: str) -> str:
+            """Set tags on a resource group. Format: key1=value1,key2=value2
+
+            Args:
+                resource_group: Resource group to tag
+                tags: Tags in format key1=value1,key2=value2
+            """
+            logger.info("set_resource_group_tags: %s", resource_group)
+            if not resource_group or not tags:
+                return "Error: resource_group and tags are required"
+            try:
+                tag_dict = {}
+                for pair in tags.split(","):
+                    if "=" in pair:
+                        k, v = pair.split("=", 1)
+                        tag_dict[k.strip()] = v.strip()
+                if not tag_dict:
+                    return "Error: Invalid tags format. Use key1=value1,key2=value2"
+                return await cloud.update_resource_group_tags(resource_group, tag_dict, merge=True)
+            except Exception as e:
+                logger.error("set_resource_group_tags failed: %s", e)
+                return f"Error: {e}"
+
+    # -- Management Groups (write) ---------------------------------------------
+
+    if "mg_write" in features:
+
+        @mcp.tool()
+        async def create_management_group(group_id: str, display_name: str, parent_id: str = "") -> str:
+            """Create a new management group.
+
+            Args:
+                group_id: Unique ID for the management group
+                display_name: Display name
+                parent_id: Optional parent management group ID
+            """
+            logger.info("create_management_group: %s", group_id)
+            if not group_id or not display_name:
+                return "Error: group_id and display_name are required"
+            try:
+                parent = parent_id if parent_id else None
+                return await cloud.create_management_group(group_id, display_name, parent)
+            except Exception as e:
+                logger.error("create_management_group failed: %s", e)
+                return f"Error: {e}"
+
+        @mcp.tool()
+        async def delete_management_group(group_id: str) -> str:
+            """Delete a management group (must be empty).
+
+            Args:
+                group_id: Management group ID to delete
+            """
+            logger.info("delete_management_group: %s", group_id)
+            if not group_id:
+                return "Error: group_id is required"
+            try:
+                return await cloud.delete_management_group(group_id)
+            except Exception as e:
+                logger.error("delete_management_group failed: %s", e)
+                return f"Error: {e}"
+
+
+# Run conditional registration at import time
+_register_premium_tools()
 
 
 # =============================================================================
 # MAIN
 # =============================================================================
 
+
 def main() -> None:
     """Start the Azure Infrastructure MCP Server."""
     logger.info("Starting Azure Infrastructure MCP Server...")
 
     def signal_handler(signum: int, frame: Optional[object]) -> None:
-        logger.info(f"Shutting down (signal {signum})...")
+        logger.info("Shutting down (signal %d)...", signum)
         mcp.stop()
 
     signal.signal(signal.SIGINT, signal_handler)
@@ -644,7 +655,7 @@ def main() -> None:
     try:
         mcp.run(transport="stdio")
     except Exception as e:
-        logger.error(f"Server error: {e}")
+        logger.error("Server error: %s", e)
         sys.exit(1)
 
 

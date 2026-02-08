@@ -1,0 +1,75 @@
+# Local development compose for azops-mcp
+#
+# Usage:
+#   docker compose up                       # start license server
+#   docker compose up license-server        # license server only
+#   docker compose run --rm mcp-server      # run MCP server interactively (stdio)
+#   docker compose run --rm generate-license --tier pro --customer acme
+#
+# The MCP server uses stdio transport so it cannot be a long-running
+# service — use "docker compose run" to spawn it on demand.
+
+services:
+
+  # --------------------------------------------------------------------------
+  # License validation API  (long-running, http://localhost:8000)
+  # --------------------------------------------------------------------------
+  license-server:
+    build:
+      context: ./license-server
+      dockerfile: Dockerfile
+    container_name: azops-license-server
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount licenses.json so you can edit it without rebuilding
+      - ./license-server/licenses.json:/app/licenses.json:ro
+    environment:
+      # Or pass licenses inline instead of the file mount:
+      # LICENSES_JSON: '{"hash": {"tier":"pro","features":["rg_write"]}}'
+      - PYTHONUNBUFFERED=1
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+
+  # --------------------------------------------------------------------------
+  # MCP server  (stdio — run interactively, not as a daemon)
+  # --------------------------------------------------------------------------
+  mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: azops-mcp-server
+    stdin_open: true    # required for stdio transport
+    tty: true           # required for stdio transport
+    depends_on:
+      license-server:
+        condition: service_healthy
+    environment:
+      # Point at the license server running in compose
+      - LICENSE_API_URL=http://license-server:8000
+      # Cache the license for the session (seconds)
+      - LICENSE_CACHE_TTL=3600
+    env_file:
+      # Loads AUTH_TOKEN, AZURE_SUBSCRIPTION_ID, etc.
+      - path: .env
+        required: false
+    profiles:
+      # Not started by default with `docker compose up`.
+      # Use `docker compose run --rm mcp-server` instead.
+      - cli
+
+  # --------------------------------------------------------------------------
+  # One-shot: generate a license key
+  # --------------------------------------------------------------------------
+  generate-license:
+    build:
+      context: ./license-server
+      dockerfile: Dockerfile
+    entrypoint: ["python", "generate_license.py"]
+    profiles:
+      - tools

@@ -31,18 +31,31 @@ nav_order: 1
 ### How It Works
 
 ```
-┌──────────────┐       MCP (stdio)       ┌──────────────┐     Azure SDK     ┌─────────┐
-│  AI Assistant │  ◄──────────────────►  │  azops-mcp   │  ◄────────────►  │  Azure  │
-│  (Cursor,     │   JSON-RPC messages    │  MCP Server   │   REST API calls │  Cloud  │
-│   Claude, …)  │                        │               │                  │         │
-└──────────────┘                         └──────────────┘                  └─────────┘
+                                                          on startup
+┌──────────────┐       MCP (stdio)       ┌──────────────┐ ─────────► ┌─────────────────┐
+│  AI Assistant │  ◄──────────────────►  │  azops-mcp   │            │ License Server  │
+│  (Cursor,     │   JSON-RPC messages    │  MCP Server   │ ◄──────── │ (validates keys) │
+│   Claude, …)  │                        │               │  features └─────────────────┘
+└──────────────┘                         └───────┬───────┘
+                                                 │
+                                          Azure SDK REST
+                                                 │
+                                                 ▼
+                                          ┌─────────────┐
+                                          │  Azure Cloud │
+                                          └─────────────┘
 ```
 
-The server runs locally as a subprocess of your AI client. It communicates over **stdio** using the MCP JSON-RPC protocol. When the assistant decides to call a tool (e.g. `list_resource_groups`), the server authenticates against Azure using your CLI credentials or a Service Principal and returns the results.
+The server runs locally as a subprocess of your AI client. On startup it validates the `AUTH_TOKEN` against a **license server** to determine which features are available. Free-tier tools (read-only) are always registered. Premium tools (write/mutate) only appear when the license grants the corresponding feature flag — without a valid token, premium tools are completely invisible to the AI client.
 
-### Free & Paid Tiers
+### Free & Premium Tiers
 
-Read-only tools work without any token. Write operations (create, delete, modify) require an `AUTH_TOKEN` in your `.env` file. See [Authentication](/azops-mcp/authentication) for details.
+| Tier | What you get |
+|:-----|:-------------|
+| **Free** | 23 read-only and operational tools — no token needed |
+| **Premium** | 8 additional write/mutate tools — requires a validated `AUTH_TOKEN` |
+
+Premium tools are **not registered** without a valid license. They don't show up in `tools/list`, the LLM never sees them, and there is no "access denied" leakage. See [Authentication](/azops-mcp/authentication) for details.
 
 ## Project Structure
 
@@ -50,16 +63,22 @@ Read-only tools work without any token. Write operations (create, delete, modify
 azops-mcp/
 ├── src/azops_mcp/
 │   ├── __main__.py          # Module entry point
-│   ├── server.py            # MCP server — tool definitions & routing
+│   ├── server.py            # MCP server — free tools + conditional premium registration
 │   ├── config.py            # ServerConfig dataclass & env loading
 │   ├── tools/
-│   │   ├── cloud.py         # Azure SDK integrations (all Azure calls)
-│   │   ├── containers.py    # Docker container management
-│   │   └── monitoring.py    # System metrics & service health
+│   │   └── cloud.py         # Azure SDK integrations (all Azure calls)
 │   └── utils/
-│       ├── auth.py          # Paywall / AUTH_TOKEN validation
+│       ├── auth.py          # Remote license validation & caching
 │       └── helpers.py       # HTTP client, error formatting
+├── license-server/          # License validation microservice
+│   ├── main.py              # FastAPI app (POST /v1/license/validate)
+│   ├── generate_license.py  # CLI tool to create license keys
+│   ├── licenses.json        # Token-hash → license mapping (the "database")
+│   ├── Dockerfile           # Container image for the license server
+│   └── requirements.txt     # FastAPI + uvicorn
 ├── tests/                   # pytest test suite
+├── Dockerfile               # Container image for the MCP server
+├── docker-compose.yml       # Local dev: both services
 ├── pyproject.toml           # Project metadata & dependencies
 ├── quickstart.sh            # One-command setup script
 └── .env.example             # Configuration template

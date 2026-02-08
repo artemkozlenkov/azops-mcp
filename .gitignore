@@ -77,6 +77,9 @@ pip-delete-this-directory.txt
 .uv/
 uv.lock
 
+# License server - real license data
+license-server/licenses.json
+
 # Misc
 *.bak
 *.tmp

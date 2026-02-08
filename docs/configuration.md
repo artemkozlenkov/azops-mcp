@@ -40,6 +40,18 @@ A global singleton `config` is created at import time and used throughout the ap
 
 If `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, and `AZURE_TENANT_ID` are **all** set, the server uses Service Principal authentication. Otherwise, it falls back to Azure CLI / Managed Identity.
 
+### License / Premium Features
+
+| Variable | Default | Description |
+|:---------|:--------|:------------|
+| `AUTH_TOKEN` | — | License key for premium features. Validated remotely against `LICENSE_API_URL`. |
+| `LICENSE_API_URL` | — | URL of the license validation server (e.g. `http://localhost:8000`). Required for premium features. |
+| `LICENSE_CACHE_TTL` | `3600` | How long (seconds) to cache the license validation result. |
+
+Both `AUTH_TOKEN` and `LICENSE_API_URL` must be set for premium tools to be registered. If either is missing, the server runs in free tier.
+
+The license is validated **once on startup** and cached for `LICENSE_CACHE_TTL` seconds. Restarting the MCP server triggers a fresh validation.
+
 ### Server Settings
 
 | Variable | Default | Description |
@@ -72,7 +84,6 @@ If `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, and `AZURE_TENANT_ID` are **all** s
 |:---------|:--------|:------------|
 | `SECRET_KEY` | `default-secret-key-change-in-production` | Application secret key |
 | `ALLOWED_HOSTS` | `localhost,127.0.0.1` | Comma-separated allowed hostnames |
-| `AUTH_TOKEN` | — | Paywall token for write operations (min 8 chars). See [Authentication](/azops-mcp/authentication#paywall-authentication-auth_token). |
 
 ---
 
@@ -103,6 +114,9 @@ new_config = reload_config()
 
 This creates a fresh `ServerConfig` instance and replaces the global `config` singleton.
 
+{: .warning }
+Reloading config does **not** re-validate the license or re-register premium tools. Restart the MCP server to pick up license changes.
+
 ---
 
 ## Example `.env` File
@@ -124,6 +138,8 @@ RATE_LIMIT_ENABLED=true
 RATE_LIMIT_REQUESTS_PER_MINUTE=60
 DEBUG=false
 
-# Paywall — uncomment to enable write operations
-# AUTH_TOKEN=your-secure-token-at-least-8-chars
+# Premium features — uncomment to enable write operations
+# AUTH_TOKEN=azops_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+# LICENSE_API_URL=http://localhost:8000
+# LICENSE_CACHE_TTL=3600
 ```

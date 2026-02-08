@@ -1,12 +1,20 @@
 """Utility functions for the infrastructure MCP server."""
 
-from .auth import check_auth_token, is_paywall_enabled, require_auth_token
+from .auth import (
+    get_licensed_features,
+    has_feature,
+    invalidate_cache,
+    is_premium_licensed,
+    validate_license,
+)
 from .helpers import format_error_message, get_env_var, make_api_request
 
 __all__ = [
-    "check_auth_token",
-    "is_paywall_enabled",
-    "require_auth_token",
+    "get_licensed_features",
+    "has_feature",
+    "invalidate_cache",
+    "is_premium_licensed",
+    "validate_license",
     "format_error_message",
     "get_env_var",
     "make_api_request",

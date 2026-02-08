@@ -53,8 +53,10 @@ class ServerConfig:
     # Debug mode
     debug: bool = field(default_factory=lambda: os.getenv("DEBUG", "false").lower() == "true")
 
-    # Paywall authentication
+    # Paywall / license authentication
     auth_token: Optional[str] = field(default_factory=lambda: os.getenv("AUTH_TOKEN"))
+    license_api_url: Optional[str] = field(default_factory=lambda: os.getenv("LICENSE_API_URL"))
+    license_cache_ttl: int = field(default_factory=lambda: int(os.getenv("LICENSE_CACHE_TTL", "3600")))
 
     def get_log_level(self) -> int:
         """Get logging level as integer."""

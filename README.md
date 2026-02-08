@@ -33,24 +33,9 @@ The script will:
 - Install all dependencies (including Azure SDKs)
 - Show configuration for Claude Desktop and Cursor
 
-### 3. Configure Claude Desktop
+### 3. Configure Your AI Client
 
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
-
-```json
-{
-  "mcpServers": {
-    "azops-mcp": {
-      "command": "uv",
-      "args": ["--directory", "/full/path/to/azops-mcp", "run", "python", "-m", "azops_mcp"]
-    }
-  }
-}
-```
-
-### 4. Configure Cursor (Optional)
-
-Add to `~/.cursor/mcp.json`:
+**Claude Desktop** — add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS):
 
 ```json
 {
@@ -63,11 +48,22 @@ Add to `~/.cursor/mcp.json`:
 }
 ```
 
-Restart Claude Desktop after adding the configuration.
+**Cursor** — add to `~/.cursor/mcp.json`:
 
-### 5. Start Using
+```json
+{
+  "mcpServers": {
+    "azops-mcp": {
+      "command": "uv",
+      "args": ["--directory", "/full/path/to/azops-mcp", "run", "python", "-m", "azops_mcp"]
+    }
+  }
+}
+```
 
-In Cursor chat, you can now:
+Restart your AI client after saving the configuration.
+
+### 4. Start Using
 
 ```
 User: List my Azure subscriptions
@@ -76,198 +72,83 @@ User: Start the VM "web-server" in resource group "production"
 User: What VMs are running in my dev resource group?
 ```
 
-### Optional: Configure Cursor
-
-If you also use Cursor, add the same configuration to `~/.cursor/mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "azops-mcp": {
-      "command": "uv",
-      "args": ["--directory", "/full/path/to/azops-mcp", "run", "python", "-m", "azops_mcp"]
-    }
-  }
-}
-```
-
 ## Authentication
 
-### Option 1: Azure CLI (Recommended)
+### Azure Authentication
+
+| Priority | Method | When |
+|:---------|:-------|:-----|
+| 1 | **Service Principal** | `AZURE_CLIENT_ID` + `SECRET` + `TENANT_ID` all set in `.env` |
+| 2 | **Azure CLI** | After `az login` (recommended for development) |
+| 3 | **Managed Identity** | When running in Azure |
+
+### Premium License
+
+The server has two tiers. Free-tier tools (23 read-only/operational) are always available. Premium tools (8 write/mutate operations) require a license validated against a remote license server.
+
+**Without a valid license, premium tools are completely invisible** — they are not registered in the MCP tool catalog and the LLM never sees them.
+
+To enable premium features:
 
 ```bash
-az login
+# 1. Generate a license key
+cd license-server
+python generate_license.py --tier pro --customer your-name
+
+# 2. Add the hash to license-server/licenses.json
+# 3. Start the license server
+uvicorn main:app --port 8000
+
+# 4. Configure .env
+AUTH_TOKEN=azops_your-key-here
+LICENSE_API_URL=http://localhost:8000
 ```
 
-That's it! The server uses your CLI credentials automatically.
+See the [Authentication docs](https://artemkozlenkov.github.io/azops-mcp/authentication) for the full walkthrough.
 
-### Option 2: Service Principal (Production)
+## Available Tools
 
-Create a `.env` file:
+### Free Tier (23 tools — always available)
 
-```env
-AZURE_SUBSCRIPTION_ID=your-subscription-id
-AZURE_TENANT_ID=your-tenant-id
-AZURE_CLIENT_ID=your-client-id
-AZURE_CLIENT_SECRET=your-client-secret
+| Category | Tools |
+|:---------|:------|
+| Health | `health_check` |
+| Subscriptions | `list_subscriptions`, `set_subscription`, `auth_status`, `list_locations`, `list_tenants` |
+| Management Groups | `list_management_groups`, `get_management_group` |
+| RBAC | `list_role_definitions` |
+| Locks | `list_resource_locks` |
+| Tags | `list_tags` |
+| Activity Log | `get_activity_log` |
+| Resource Groups | `list_resource_groups`, `list_resources` |
+| VMs | `list_vms`, `get_vm_status`, `start_vm`, `stop_vm`, `restart_vm`, `deallocate_vm`, `scale_vmss` |
+| Storage | `list_storage_accounts`, `get_storage_status` |
+
+### Premium Tier (8 tools — require valid license)
+
+| Feature Flag | Tools |
+|:------------|:------|
+| `rg_write` | `create_resource_group`, `delete_resource_group` |
+| `rbac` | `list_role_assignments` |
+| `locks_write` | `create_resource_lock`, `delete_resource_lock` |
+| `tags_write` | `set_resource_group_tags` |
+| `mg_write` | `create_management_group`, `delete_management_group` |
+
+## Docker Compose (Local Dev)
+
+Run everything with containers:
+
+```bash
+# Start the license server
+docker compose up license-server
+
+# Run the MCP server interactively
+docker compose run --rm mcp-server
+
+# Generate a license key
+docker compose run --rm generate-license --tier pro --customer acme
 ```
 
-### Option 3: Set Subscription in Chat
-
-No configuration needed - use `list_subscriptions` and `set_subscription` tools directly in chat.
-
-### Authentication Priority
-
-1. **Service Principal** - If all credentials are set in `.env`
-2. **Azure CLI** - Uses `az login` credentials
-3. **Managed Identity** - When running in Azure
-
-Use `auth_status` to check which method is active.
-
-## Paywall Authentication
-
-The server supports a paywall authentication system that restricts access to certain features:
-
-### Free Tier (No AUTH_TOKEN required)
-- Read-only operations
-- `list_subscriptions`, `list_resource_groups`, `list_vms`, `list_storage_accounts`
-- `get_vm_status`, `get_storage_status`, `list_locations`, `list_tenants`
-- `auth_status`, `health_check`
-
-### Paid Tier (AUTH_TOKEN required)
-Full CRUD operations including:
-- `create_resource_group`, `delete_resource_group`
-- `create_resource_lock`, `delete_resource_lock`
-- `set_resource_group_tags`
-- `list_role_assignments` (RBAC assignment management)
-
-### Setting AUTH_TOKEN
-
-Add to your `.env` file:
-```env
-AUTH_TOKEN=your-secure-auth-token-min-8-chars
-```
-
-**Note**: AUTH_TOKEN must be at least 8 characters long.
-
-If AUTH_TOKEN is not configured, paywall tools will return an access denied error with instructions on how to enable them.
-
-## Available Tools (31)
-
-### Health & Status
-| Tool | Description |
-|------|-------------|
-| `health_check` | Server health and Azure SDK status |
-
-### Subscription & Authentication
-| Tool | Description |
-|------|-------------|
-| `list_subscriptions` | List accessible subscriptions |
-| `set_subscription` | Set active subscription for session |
-| `auth_status` | Current authentication method |
-| `list_locations` | Available Azure regions |
-| `list_tenants` | Azure AD tenants |
-
-### Management Groups
-| Tool | Description |
-|------|-------------|
-| `list_management_groups` | List all management groups |
-| `get_management_group` | Details and child resources |
-| `create_management_group` | Create new management group |
-| `delete_management_group` | Delete (must be empty) |
-
-### RBAC
-| Tool | Description |
-|------|-------------|
-| `list_role_assignments` | Role assignments for scope (paywall) |
-| `list_role_definitions` | Available built-in roles |
-
-### Resource Locks
-| Tool | Description |
-|------|-------------|
-| `list_resource_locks` | List locks on resources |
-| `create_resource_lock` | Create CanNotDelete/ReadOnly lock (paywall) |
-| `delete_resource_lock` | Remove a lock (paywall) |
-
-### Tags
-| Tool | Description |
-|------|-------------|
-| `list_tags` | Tags in subscription/resource group |
-| `set_resource_group_tags` | Set tags (paywall) |
-
-### Activity Log
-| Tool | Description |
-|------|-------------|
-| `get_activity_log` | Recent audit log (1-7 days) |
-
-### Resource Groups
-| Tool | Description |
-|------|-------------|
-| `list_resource_groups` | All resource groups |
-| `create_resource_group` | Create new resource group (paywall) |
-| `delete_resource_group` | Delete with ALL resources ⚠️ (paywall) |
-
-### Virtual Machines
-| Tool | Description |
-|------|-------------|
-| `list_vms` | VMs in a resource group |
-| `get_vm_status` | Power state and details |
-| `start_vm` | Start a VM |
-| `stop_vm` | Stop (stays allocated, charges continue) |
-| `restart_vm` | Restart a VM |
-| `deallocate_vm` | Deallocate (no compute charges) |
-| `scale_vmss` | Scale VM Scale Set capacity |
-
-### Storage Accounts
-| Tool | Description |
-|------|-------------|
-| `list_storage_accounts` | Storage accounts in resource group |
-| `get_storage_status` | Account status and endpoints |
-
-## Usage Examples
-
-### List and manage subscriptions
-```
-User: What subscriptions do I have access to?
-User: Switch to subscription "Production"
-```
-
-### Work with resource groups
-```
-User: List all resource groups
-User: Create a resource group called "dev-resources" in eastus
-User: Tag the production resource group with environment=prod,team=platform
-```
-
-### Manage VMs
-```
-User: What VMs are in the web-servers resource group?
-User: Start the VM "api-server-01" in production-rg
-User: Deallocate all VMs in dev-rg to save costs
-```
-
-### Governance
-```
-User: Show me the management group hierarchy
-User: Who has access to the production resource group?
-User: Lock the production-db resource group to prevent deletion
-User: Show activity log for the last 3 days
-```
-
-## Configuration
-
-Environment variables (`.env`):
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `LOG_LEVEL` | `INFO` | DEBUG, INFO, WARNING, ERROR |
-| `AZURE_SUBSCRIPTION_ID` | - | Default subscription |
-| `AZURE_DEFAULT_LOCATION` | `eastus` | Default region for new resources |
-| `RATE_LIMIT_ENABLED` | `true` | Enable rate limiting |
-| `RATE_LIMIT_REQUESTS_PER_MINUTE` | `60` | Max requests/minute |
-| `AUTH_TOKEN` | - | Paywall authentication token (min 8 chars) |
-
-See `.env.example` for complete configuration examples.
+See the [Docker docs](https://artemkozlenkov.github.io/azops-mcp/docker) for full instructions.
 
 ## Project Structure
 
@@ -275,80 +156,70 @@ See `.env.example` for complete configuration examples.
 azops-mcp/
 ├── src/azops_mcp/
 │   ├── __main__.py        # Module entry point
-│   ├── server.py          # MCP server & tool definitions
+│   ├── server.py          # MCP server — free + conditional premium tools
 │   ├── config.py          # Configuration management
-│   └── tools/
-│       └── cloud.py       # Azure SDK integrations
+│   ├── tools/
+│   │   └── cloud.py       # Azure SDK integrations
+│   └── utils/
+│       ├── auth.py        # Remote license validation & caching
+│       └── helpers.py     # HTTP client, error formatting
+├── license-server/        # License validation microservice
+│   ├── main.py            # FastAPI app
+│   ├── generate_license.py
+│   ├── licenses.json      # Token hash → license mapping
+│   └── Dockerfile
 ├── tests/                 # Unit tests
-├── quickstart.sh          # Setup script
+├── docs/                  # GitHub Pages documentation
+├── Dockerfile             # MCP server container image
+├── docker-compose.yml     # Local dev orchestration
 ├── pyproject.toml         # Dependencies & metadata
+├── quickstart.sh          # Setup script
 └── .env.example           # Configuration template
 ```
 
+## Configuration
+
+| Variable | Default | Description |
+|:---------|:--------|:------------|
+| `AZURE_SUBSCRIPTION_ID` | — | Default subscription |
+| `AZURE_DEFAULT_LOCATION` | `eastus` | Default region for new resources |
+| `AUTH_TOKEN` | — | License key (validated remotely) |
+| `LICENSE_API_URL` | — | License server URL |
+| `LICENSE_CACHE_TTL` | `3600` | License cache duration (seconds) |
+| `LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR` |
+| `RATE_LIMIT_ENABLED` | `true` | Enable rate limiting |
+| `RATE_LIMIT_REQUESTS_PER_MINUTE` | `60` | Max requests/minute |
+
+See `.env.example` for the complete list.
+
 ## Development
 
-### Run Tests
 ```bash
+# Install with dev dependencies
 uv pip install -e ".[dev]"
+
+# Run tests
 pytest
-pytest --cov=azops_mcp --cov-report=html
-```
 
-### Code Quality
-```bash
-black src/ tests/      # Format
-ruff check src/ tests/ # Lint
-mypy src/              # Type check
-```
+# Code quality
+black src/ tests/
+ruff check src/ tests/
+mypy src/
 
-### Run Server Manually
-```bash
+# Run server manually
 uv run python -m azops_mcp
 ```
 
-## Troubleshooting
+## Documentation
 
-### "Module not found" errors
-```bash
-# Reinstall dependencies
-uv pip install -e . --reinstall
-```
+Full documentation is available at [artemkozlenkov.github.io/azops-mcp](https://artemkozlenkov.github.io/azops-mcp/).
 
-### "Subscription not configured"
-```bash
-# Option 1: Set in .env
-echo "AZURE_SUBSCRIPTION_ID=$(az account show --query id -o tsv)" >> .env
-
-# Option 2: Use set_subscription tool in chat
-```
-
-### "Authentication failed"
-```bash
-# Re-authenticate with Azure CLI
-az login
-
-# Check auth status in chat
-User: What's my auth status?
-```
-
-### SDK not found
-```bash
-# Run quickstart.sh and select option 3 to install Azure SDKs
-./quickstart.sh
-```
-
-## Azure SDK Dependencies
-
-| Package | Purpose |
-|---------|---------|
-| `azure-identity` | Authentication |
-| `azure-mgmt-subscription` | Subscriptions, tenants |
-| `azure-mgmt-resource` | Resource groups, locks, tags |
-| `azure-mgmt-compute` | VMs, VMSS |
-| `azure-mgmt-storage` | Storage accounts |
-| `azure-mgmt-managementgroups` | Management groups |
-| `azure-mgmt-authorization` | RBAC |
-| `azure-mgmt-monitor` | Activity logs |
+- [Getting Started](https://artemkozlenkov.github.io/azops-mcp/getting-started)
+- [Architecture](https://artemkozlenkov.github.io/azops-mcp/architecture)
+- [Tools Reference](https://artemkozlenkov.github.io/azops-mcp/tools-reference)
+- [Authentication](https://artemkozlenkov.github.io/azops-mcp/authentication)
+- [Configuration](https://artemkozlenkov.github.io/azops-mcp/configuration)
+- [Docker](https://artemkozlenkov.github.io/azops-mcp/docker)
 
 ## License
 

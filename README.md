@@ -1,6 +1,6 @@
 # Azure Infrastructure MCP Server
 
-A Model Context Protocol (MCP) server for managing Azure infrastructure directly from AI assistants like Claude in Cursor, VS Code, or any MCP-compatible client.
+A Model Context Protocol (MCP) server for managing Azure infrastructure directly from AI assistants like Claude in Cursor, VS Code, Claude Desktop, or any MCP-compatible client.
 
 ## What You Can Do
 
@@ -31,9 +31,24 @@ cd azops-mcp
 The script will:
 - Create a virtual environment with Python 3.12
 - Install all dependencies (including Azure SDKs)
-- Show Cursor configuration
+- Show configuration for Claude Desktop and Cursor
 
-### 3. Configure Cursor
+### 3. Configure Claude Desktop
+
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+
+```json
+{
+  "mcpServers": {
+    "azops-mcp": {
+      "command": "uv",
+      "args": ["--directory", "/full/path/to/azops-mcp", "run", "python", "-m", "azops_mcp"]
+    }
+  }
+}
+```
+
+### 4. Configure Cursor (Optional)
 
 Add to `~/.cursor/mcp.json`:
 
@@ -48,9 +63,9 @@ Add to `~/.cursor/mcp.json`:
 }
 ```
 
-Restart Cursor after adding the configuration.
+Restart Claude Desktop after adding the configuration.
 
-### 4. Start Using
+### 5. Start Using
 
 In Cursor chat, you can now:
 
@@ -59,6 +74,21 @@ User: List my Azure subscriptions
 User: Show resource groups in subscription xxx-xxx-xxx
 User: Start the VM "web-server" in resource group "production"
 User: What VMs are running in my dev resource group?
+```
+
+### Optional: Configure Cursor
+
+If you also use Cursor, add the same configuration to `~/.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "azops-mcp": {
+      "command": "uv",
+      "args": ["--directory", "/full/path/to/azops-mcp", "run", "python", "-m", "azops_mcp"]
+    }
+  }
+}
 ```
 
 ## Authentication
@@ -94,6 +124,34 @@ No configuration needed - use `list_subscriptions` and `set_subscription` tools 
 
 Use `auth_status` to check which method is active.
 
+## Paywall Authentication
+
+The server supports a paywall authentication system that restricts access to certain features:
+
+### Free Tier (No AUTH_TOKEN required)
+- Read-only operations
+- `list_subscriptions`, `list_resource_groups`, `list_vms`, `list_storage_accounts`
+- `get_vm_status`, `get_storage_status`, `list_locations`, `list_tenants`
+- `auth_status`, `health_check`
+
+### Paid Tier (AUTH_TOKEN required)
+Full CRUD operations including:
+- `create_resource_group`, `delete_resource_group`
+- `create_resource_lock`, `delete_resource_lock`
+- `set_resource_group_tags`
+- `list_role_assignments` (RBAC assignment management)
+
+### Setting AUTH_TOKEN
+
+Add to your `.env` file:
+```env
+AUTH_TOKEN=your-secure-auth-token-min-8-chars
+```
+
+**Note**: AUTH_TOKEN must be at least 8 characters long.
+
+If AUTH_TOKEN is not configured, paywall tools will return an access denied error with instructions on how to enable them.
+
 ## Available Tools (31)
 
 ### Health & Status
@@ -121,21 +179,21 @@ Use `auth_status` to check which method is active.
 ### RBAC
 | Tool | Description |
 |------|-------------|
-| `list_role_assignments` | Role assignments for scope |
+| `list_role_assignments` | Role assignments for scope (paywall) |
 | `list_role_definitions` | Available built-in roles |
 
 ### Resource Locks
 | Tool | Description |
 |------|-------------|
 | `list_resource_locks` | List locks on resources |
-| `create_resource_lock` | Create CanNotDelete/ReadOnly lock |
-| `delete_resource_lock` | Remove a lock |
+| `create_resource_lock` | Create CanNotDelete/ReadOnly lock (paywall) |
+| `delete_resource_lock` | Remove a lock (paywall) |
 
 ### Tags
 | Tool | Description |
 |------|-------------|
 | `list_tags` | Tags in subscription/resource group |
-| `set_resource_group_tags` | Set tags (format: `key1=value1,key2=value2`) |
+| `set_resource_group_tags` | Set tags (paywall) |
 
 ### Activity Log
 | Tool | Description |
@@ -146,8 +204,8 @@ Use `auth_status` to check which method is active.
 | Tool | Description |
 |------|-------------|
 | `list_resource_groups` | All resource groups |
-| `create_resource_group` | Create new resource group |
-| `delete_resource_group` | Delete with ALL resources ⚠️ |
+| `create_resource_group` | Create new resource group (paywall) |
+| `delete_resource_group` | Delete with ALL resources ⚠️ (paywall) |
 
 ### Virtual Machines
 | Tool | Description |
@@ -207,6 +265,9 @@ Environment variables (`.env`):
 | `AZURE_DEFAULT_LOCATION` | `eastus` | Default region for new resources |
 | `RATE_LIMIT_ENABLED` | `true` | Enable rate limiting |
 | `RATE_LIMIT_REQUESTS_PER_MINUTE` | `60` | Max requests/minute |
+| `AUTH_TOKEN` | - | Paywall authentication token (min 8 chars) |
+
+See `.env.example` for complete configuration examples.
 
 ## Project Structure
 

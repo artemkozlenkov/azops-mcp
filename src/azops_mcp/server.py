@@ -11,6 +11,7 @@ from mcp.server.fastmcp import FastMCP
 
 from .tools import cloud
 from .config import config
+from .utils.auth import is_paywall_enabled, check_auth_token
 
 # Configure logging
 logging.basicConfig(
@@ -21,6 +22,27 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 mcp = FastMCP("azops-mcp")
+
+
+# =============================================================================
+# PAYWALL HELPER FUNCTIONS
+# =============================================================================
+
+def _check_paywall_access() -> Optional[str]:
+    """Check if paywall access is granted. Returns error message if not, None if allowed."""
+    if not is_paywall_enabled():
+        return (
+            "Access denied: AUTH_TOKEN not configured. "
+            "Set AUTH_TOKEN in .env to use this feature. "
+            "Free tier tools (read-only operations) are still available."
+        )
+    is_valid, error_msg = check_auth_token()
+    if not is_valid:
+        return (
+            f"Access denied: {error_msg} "
+            "Set a valid AUTH_TOKEN in .env to use this feature."
+        )
+    return None
 
 
 # =============================================================================
@@ -196,12 +218,15 @@ async def delete_management_group(group_id: str) -> str:
 
 @mcp.tool()
 async def list_role_assignments(resource_group: str = "") -> str:
-    """List role assignments (RBAC) for subscription or resource group.
+    """List role assignments (RBAC) for subscription or resource group (paywall feature).
 
     Args:
         resource_group: Optional resource group to filter by
     """
     logger.info(f"list_role_assignments: {resource_group or 'subscription'}")
+    paywall_error = _check_paywall_access()
+    if paywall_error:
+        return paywall_error
     try:
         rg = resource_group if resource_group else None
         return await cloud.list_role_assignments(rg)
@@ -243,7 +268,7 @@ async def list_resource_locks(resource_group: str = "") -> str:
 
 @mcp.tool()
 async def create_resource_lock(resource_group: str, lock_name: str, lock_level: str = "CanNotDelete") -> str:
-    """Create a lock on a resource group to prevent deletion or modification.
+    """Create a lock on a resource group to prevent deletion or modification (paywall feature).
 
     Args:
         resource_group: Resource group to lock
@@ -253,6 +278,9 @@ async def create_resource_lock(resource_group: str, lock_name: str, lock_level: 
     logger.info(f"create_resource_lock: {resource_group}/{lock_name}")
     if not resource_group or not lock_name:
         return "Error: resource_group and lock_name are required"
+    paywall_error = _check_paywall_access()
+    if paywall_error:
+        return paywall_error
     try:
         return await cloud.create_resource_lock(resource_group, lock_name, lock_level)
     except Exception as e:
@@ -262,7 +290,7 @@ async def create_resource_lock(resource_group: str, lock_name: str, lock_level: 
 
 @mcp.tool()
 async def delete_resource_lock(resource_group: str, lock_name: str) -> str:
-    """Delete a resource lock from a resource group.
+    """Delete a resource lock from a resource group (paywall feature).
 
     Args:
         resource_group: Resource group containing the lock
@@ -271,6 +299,9 @@ async def delete_resource_lock(resource_group: str, lock_name: str) -> str:
     logger.info(f"delete_resource_lock: {resource_group}/{lock_name}")
     if not resource_group or not lock_name:
         return "Error: resource_group and lock_name are required"
+    paywall_error = _check_paywall_access()
+    if paywall_error:
+        return paywall_error
     try:
         return await cloud.delete_resource_lock(resource_group, lock_name)
     except Exception as e:
@@ -300,7 +331,7 @@ async def list_tags(resource_group: str = "") -> str:
 
 @mcp.tool()
 async def set_resource_group_tags(resource_group: str, tags: str) -> str:
-    """Set tags on a resource group. Format: key1=value1,key2=value2
+    """Set tags on a resource group (paywall feature). Format: key1=value1,key2=value2
 
     Args:
         resource_group: Resource group to tag
@@ -309,6 +340,9 @@ async def set_resource_group_tags(resource_group: str, tags: str) -> str:
     logger.info(f"set_resource_group_tags: {resource_group}")
     if not resource_group or not tags:
         return "Error: resource_group and tags are required"
+    paywall_error = _check_paywall_access()
+    if paywall_error:
+        return paywall_error
     try:
         # Parse tags string
         tag_dict = {}
@@ -316,10 +350,10 @@ async def set_resource_group_tags(resource_group: str, tags: str) -> str:
             if "=" in pair:
                 k, v = pair.split("=", 1)
                 tag_dict[k.strip()] = v.strip()
-        
+
         if not tag_dict:
             return "Error: Invalid tags format. Use key1=value1,key2=value2"
-        
+
         return await cloud.update_resource_group_tags(resource_group, tag_dict, merge=True)
     except Exception as e:
         logger.error(f"set_resource_group_tags failed: {e}")
@@ -364,7 +398,7 @@ async def list_resource_groups() -> str:
 
 @mcp.tool()
 async def create_resource_group(name: str, location: str) -> str:
-    """Create a new Azure resource group.
+    """Create a new Azure resource group (paywall feature).
 
     Args:
         name: Resource group name (e.g., my-app-rg)
@@ -373,6 +407,9 @@ async def create_resource_group(name: str, location: str) -> str:
     logger.info(f"create_resource_group: {name} in {location}")
     if not name or not location:
         return "Error: name and location are required"
+    paywall_error = _check_paywall_access()
+    if paywall_error:
+        return paywall_error
     try:
         return await cloud.create_resource_group(name, location)
     except Exception as e:
@@ -382,7 +419,7 @@ async def create_resource_group(name: str, location: str) -> str:
 
 @mcp.tool()
 async def delete_resource_group(name: str) -> str:
-    """Delete a resource group and ALL its resources. WARNING: Irreversible!
+    """Delete a resource group and ALL its resources. WARNING: Irreversible! (paywall feature).
 
     Args:
         name: Resource group name to delete
@@ -390,6 +427,9 @@ async def delete_resource_group(name: str) -> str:
     logger.info(f"delete_resource_group: {name}")
     if not name:
         return "Error: name is required"
+    paywall_error = _check_paywall_access()
+    if paywall_error:
+        return paywall_error
     try:
         return await cloud.delete_resource_group(name)
     except Exception as e:

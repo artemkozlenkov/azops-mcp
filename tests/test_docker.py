@@ -1,7 +1,8 @@
 """Tests for Docker container runtime tools."""
 
-import pytest
 from unittest.mock import AsyncMock, patch
+
+import pytest
 
 from azops_mcp import server
 

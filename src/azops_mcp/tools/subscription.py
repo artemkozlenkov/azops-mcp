@@ -2,7 +2,6 @@
 
 import logging
 import re
-from typing import Optional
 
 from ..config import config
 from ..utils.helpers import format_error_message

@@ -1,7 +1,8 @@
 """Tests for subscription, auth, and account management tools."""
 
-import pytest
 from unittest.mock import AsyncMock, patch
+
+import pytest
 
 from azops_mcp import server
 

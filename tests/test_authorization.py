@@ -1,7 +1,8 @@
 """Tests for RBAC authorization tools."""
 
-import pytest
 from unittest.mock import AsyncMock, patch
+
+import pytest
 
 from azops_mcp import server
 

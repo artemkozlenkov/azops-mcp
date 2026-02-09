@@ -3,7 +3,6 @@
 import logging
 import platform
 import subprocess
-from typing import Dict, Any
 
 from ..utils.helpers import format_error_message
 
@@ -12,13 +11,12 @@ logger = logging.getLogger(__name__)
 
 async def get_system_metrics() -> str:
     """Get system metrics (CPU, memory, disk usage).
-    
+
     Returns:
         Formatted system metrics
     """
     try:
-        metrics: Dict[str, Any] = {}
-        
+
         # Get CPU usage (simplified - in production, use psutil or similar)
         if platform.system() == "Linux":
             # Linux CPU usage
@@ -45,7 +43,7 @@ async def get_system_metrics() -> str:
                 cpu_info = f"CPU: {result.stdout.strip()}"
         else:
             cpu_info = "CPU usage: Platform not supported for detailed metrics"
-        
+
         # Get memory usage
         if platform.system() == "Linux":
             result = subprocess.run(
@@ -65,7 +63,7 @@ async def get_system_metrics() -> str:
             memory_info = result.stdout if result.returncode == 0 else "Memory: Unable to determine"
         else:
             memory_info = "Memory: Platform not supported for detailed metrics"
-        
+
         # Get disk usage
         result = subprocess.run(
             ["df", "-h"],
@@ -74,14 +72,14 @@ async def get_system_metrics() -> str:
             timeout=5,
         )
         disk_info = result.stdout if result.returncode == 0 else "Disk: Unable to determine"
-        
+
         return (
             f"System Metrics:\n\n"
             f"{cpu_info}\n\n"
             f"Memory:\n{memory_info}\n\n"
             f"Disk Usage:\n{disk_info}"
         )
-        
+
     except Exception as e:
         error_msg = format_error_message(e, "Failed to get system metrics")
         logger.error(error_msg)
@@ -90,10 +88,10 @@ async def get_system_metrics() -> str:
 
 async def check_service_health(service_name: str) -> str:
     """Check health of a system service.
-    
+
     Args:
         service_name: Name of the service to check
-        
+
     Returns:
         Service health status
     """
@@ -118,7 +116,7 @@ async def check_service_health(service_name: str) -> str:
                     timeout=5,
                 )
                 return f"Service '{service_name}' status:\n{result.stdout}"
-                
+
         elif platform.system() == "Darwin":  # macOS
             result = subprocess.run(
                 ["launchctl", "list", "|", "grep", service_name],
@@ -133,7 +131,7 @@ async def check_service_health(service_name: str) -> str:
                 return f"Service '{service_name}' not found or not running."
         else:
             return f"Service health check not supported on {platform.system()}"
-            
+
     except FileNotFoundError:
         return f"Unable to check service '{service_name}'. System service manager not available."
     except subprocess.TimeoutExpired:
@@ -146,13 +144,13 @@ async def check_service_health(service_name: str) -> str:
 
 async def get_infrastructure_status() -> str:
     """Get overall infrastructure health status.
-    
+
     Returns:
         Summary of infrastructure health
     """
     try:
         status_items = []
-        
+
         # Check Docker if available
         try:
             result = subprocess.run(
@@ -167,7 +165,7 @@ async def get_infrastructure_status() -> str:
                 status_items.append("✗ Docker: Not available or not running")
         except (FileNotFoundError, subprocess.TimeoutExpired):
             status_items.append("✗ Docker: Not installed or not accessible")
-        
+
         # Check system load
         if platform.system() in ["Linux", "Darwin"]:
             try:
@@ -181,13 +179,13 @@ async def get_infrastructure_status() -> str:
                     status_items.append(f"✓ System Uptime: {result.stdout.strip()}")
             except Exception:
                 pass
-        
+
         # Overall status
         if not status_items:
             return "Infrastructure Status: Unable to determine (limited platform support)"
-        
+
         return "Infrastructure Status:\n\n" + "\n".join(status_items)
-        
+
     except Exception as e:
         error_msg = format_error_message(e, "Failed to get infrastructure status")
         logger.error(error_msg)

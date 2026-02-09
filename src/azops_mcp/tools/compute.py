@@ -1,7 +1,7 @@
 """VM and VMSS management tools."""
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from ..utils.helpers import format_error_message
 from ._clients import (

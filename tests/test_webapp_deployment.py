@@ -1,7 +1,8 @@
 """Tests for Web App for Containers deployment tools."""
 
-import pytest
 from unittest.mock import AsyncMock, patch
+
+import pytest
 
 from azops_mcp import server
 

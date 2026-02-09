@@ -53,11 +53,6 @@ class ServerConfig:
     # Debug mode
     debug: bool = field(default_factory=lambda: os.getenv("DEBUG", "false").lower() == "true")
 
-    # Paywall / license authentication
-    auth_token: Optional[str] = field(default_factory=lambda: os.getenv("AUTH_TOKEN"))
-    license_api_url: Optional[str] = field(default_factory=lambda: os.getenv("LICENSE_API_URL"))
-    license_cache_ttl: int = field(default_factory=lambda: int(os.getenv("LICENSE_CACHE_TTL", "3600")))
-
     def get_log_level(self) -> int:
         """Get logging level as integer."""
         return getattr(logging, self.log_level, logging.INFO)
@@ -97,10 +92,6 @@ class ServerConfig:
                 if not self.azure_tenant_id:
                     missing.append("AZURE_TENANT_ID")
                 errors.append(f"Incomplete Service Principal config. Missing: {', '.join(missing)}")
-
-        # Validate paywall auth token
-        if self.auth_token and len(self.auth_token) < 8:
-            errors.append("AUTH_TOKEN must be at least 8 characters")
 
         # Subscription ID is always required
         if not self.azure_subscription_id:

@@ -1,15 +1,5 @@
 #!/usr/bin/env python3
 """Azure Infrastructure MCP Server - Core platform tools for Azure management.
-
-Tools are split into two tiers:
-
-  FREE   — read-only / operational tools, always registered.
-  PREMIUM — write / mutating tools, registered only when the license
-            server grants the corresponding feature flag.
-
-On startup the server validates AUTH_TOKEN against LICENSE_API_URL.
-If validation fails (or no token is set), only free-tier tools appear
-in the MCP ``tools/list`` response — premium tools are invisible.
 """
 
 import logging
@@ -22,7 +12,6 @@ from mcp.server.fastmcp import FastMCP
 
 from .config import config
 from .tools import cloud
-from .utils.auth import get_licensed_features, validate_license
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -69,11 +58,9 @@ async def health_check() -> Dict[str, Any]:
             except ImportError:
                 deps[pkg] = "missing"
 
-        license_info = validate_license()
         return {
             "status": "healthy",
             "dependencies": deps,
-            "license_tier": license_info.get("tier", "free"),
             "timestamp": datetime.now().isoformat(),
             "version": "1.0.0",
         }
@@ -120,6 +107,47 @@ async def auth_status() -> str:
         return await cloud.get_auth_status()
     except Exception as e:
         logger.error("auth_status failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def account_show() -> str:
+    """Get details of the current Azure subscription (similar to 'az account show')."""
+    logger.info("account_show called")
+    try:
+        return await cloud.get_account_info()
+    except Exception as e:
+        logger.error("account_show failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def account_clear() -> str:
+    """Clear cached Azure credentials and subscription override (similar to 'az account clear').
+
+    Resets in-memory subscription override and cached SDK clients so the next
+    operation re-authenticates from scratch.
+    """
+    logger.info("account_clear called")
+    try:
+        return await cloud.clear_account()
+    except Exception as e:
+        logger.error("account_clear failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def account_get_access_token(resource: str = "https://management.azure.com/.default") -> str:
+    """Get an Azure access token for utilities to access Azure (similar to 'az account get-access-token').
+
+    Args:
+        resource: The resource/scope to obtain a token for (default: Azure Resource Manager)
+    """
+    logger.info("account_get_access_token: resource=%s", resource)
+    try:
+        return await cloud.get_access_token(resource)
+    except Exception as e:
+        logger.error("account_get_access_token failed: %s", e)
         return f"Error: {e}"
 
 
@@ -449,191 +477,6 @@ async def get_storage_status(resource_group: str, account_name: str) -> str:
         return f"Error: {e}"
 
 
-# =============================================================================
-# PREMIUM TIER — conditionally registered based on license features
-# =============================================================================
-
-
-def _register_premium_tools() -> None:
-    """Register premium tools whose feature flags are present in the license.
-
-    Called once at module-load time.  If the license server is unreachable
-    or the token is invalid, no premium tools are registered and the MCP
-    client never sees them.
-    """
-    features = get_licensed_features()
-
-    if not features:
-        logger.info("No premium features licensed — only free-tier tools available")
-        return
-
-    logger.info("Registering premium tools for features: %s", features)
-
-    # -- Resource Groups (write) -----------------------------------------------
-
-    if "rg_write" in features:
-
-        @mcp.tool()
-        async def create_resource_group(name: str, location: str) -> str:
-            """Create a new Azure resource group.
-
-            Args:
-                name: Resource group name (e.g., my-app-rg)
-                location: Azure region (e.g., eastus, westeurope)
-            """
-            logger.info("create_resource_group: %s in %s", name, location)
-            if not name or not location:
-                return "Error: name and location are required"
-            try:
-                return await cloud.create_resource_group(name, location)
-            except Exception as e:
-                logger.error("create_resource_group failed: %s", e)
-                return f"Error: {e}"
-
-        @mcp.tool()
-        async def delete_resource_group(name: str) -> str:
-            """Delete a resource group and ALL its resources. WARNING: Irreversible!
-
-            Args:
-                name: Resource group name to delete
-            """
-            logger.info("delete_resource_group: %s", name)
-            if not name:
-                return "Error: name is required"
-            try:
-                return await cloud.delete_resource_group(name)
-            except Exception as e:
-                logger.error("delete_resource_group failed: %s", e)
-                return f"Error: {e}"
-
-    # -- RBAC ------------------------------------------------------------------
-
-    if "rbac" in features:
-
-        @mcp.tool()
-        async def list_role_assignments(resource_group: str = "") -> str:
-            """List role assignments (RBAC) for subscription or resource group.
-
-            Args:
-                resource_group: Optional resource group to filter by
-            """
-            logger.info("list_role_assignments: %s", resource_group or "subscription")
-            try:
-                rg = resource_group if resource_group else None
-                return await cloud.list_role_assignments(rg)
-            except Exception as e:
-                logger.error("list_role_assignments failed: %s", e)
-                return f"Error: {e}"
-
-    # -- Resource Locks (write) ------------------------------------------------
-
-    if "locks_write" in features:
-
-        @mcp.tool()
-        async def create_resource_lock(resource_group: str, lock_name: str, lock_level: str = "CanNotDelete") -> str:
-            """Create a lock on a resource group to prevent deletion or modification.
-
-            Args:
-                resource_group: Resource group to lock
-                lock_name: Name for the lock
-                lock_level: CanNotDelete (default) or ReadOnly
-            """
-            logger.info("create_resource_lock: %s/%s", resource_group, lock_name)
-            if not resource_group or not lock_name:
-                return "Error: resource_group and lock_name are required"
-            try:
-                return await cloud.create_resource_lock(resource_group, lock_name, lock_level)
-            except Exception as e:
-                logger.error("create_resource_lock failed: %s", e)
-                return f"Error: {e}"
-
-        @mcp.tool()
-        async def delete_resource_lock(resource_group: str, lock_name: str) -> str:
-            """Delete a resource lock from a resource group.
-
-            Args:
-                resource_group: Resource group containing the lock
-                lock_name: Name of the lock to delete
-            """
-            logger.info("delete_resource_lock: %s/%s", resource_group, lock_name)
-            if not resource_group or not lock_name:
-                return "Error: resource_group and lock_name are required"
-            try:
-                return await cloud.delete_resource_lock(resource_group, lock_name)
-            except Exception as e:
-                logger.error("delete_resource_lock failed: %s", e)
-                return f"Error: {e}"
-
-    # -- Tags (write) ----------------------------------------------------------
-
-    if "tags_write" in features:
-
-        @mcp.tool()
-        async def set_resource_group_tags(resource_group: str, tags: str) -> str:
-            """Set tags on a resource group. Format: key1=value1,key2=value2
-
-            Args:
-                resource_group: Resource group to tag
-                tags: Tags in format key1=value1,key2=value2
-            """
-            logger.info("set_resource_group_tags: %s", resource_group)
-            if not resource_group or not tags:
-                return "Error: resource_group and tags are required"
-            try:
-                tag_dict = {}
-                for pair in tags.split(","):
-                    if "=" in pair:
-                        k, v = pair.split("=", 1)
-                        tag_dict[k.strip()] = v.strip()
-                if not tag_dict:
-                    return "Error: Invalid tags format. Use key1=value1,key2=value2"
-                return await cloud.update_resource_group_tags(resource_group, tag_dict, merge=True)
-            except Exception as e:
-                logger.error("set_resource_group_tags failed: %s", e)
-                return f"Error: {e}"
-
-    # -- Management Groups (write) ---------------------------------------------
-
-    if "mg_write" in features:
-
-        @mcp.tool()
-        async def create_management_group(group_id: str, display_name: str, parent_id: str = "") -> str:
-            """Create a new management group.
-
-            Args:
-                group_id: Unique ID for the management group
-                display_name: Display name
-                parent_id: Optional parent management group ID
-            """
-            logger.info("create_management_group: %s", group_id)
-            if not group_id or not display_name:
-                return "Error: group_id and display_name are required"
-            try:
-                parent = parent_id if parent_id else None
-                return await cloud.create_management_group(group_id, display_name, parent)
-            except Exception as e:
-                logger.error("create_management_group failed: %s", e)
-                return f"Error: {e}"
-
-        @mcp.tool()
-        async def delete_management_group(group_id: str) -> str:
-            """Delete a management group (must be empty).
-
-            Args:
-                group_id: Management group ID to delete
-            """
-            logger.info("delete_management_group: %s", group_id)
-            if not group_id:
-                return "Error: group_id is required"
-            try:
-                return await cloud.delete_management_group(group_id)
-            except Exception as e:
-                logger.error("delete_management_group failed: %s", e)
-                return f"Error: {e}"
-
-
-# Run conditional registration at import time
-_register_premium_tools()
 
 
 # =============================================================================

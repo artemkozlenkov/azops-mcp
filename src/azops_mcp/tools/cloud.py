@@ -1286,6 +1286,81 @@ async def get_activity_log(resource_group: Optional[str] = None, days: int = 1) 
         return error_msg
 
 
+async def clear_account() -> str:
+    """Clear cached Azure credentials and subscription override (similar to 'az account clear').
+
+    Resets the runtime subscription ID override and clears all cached Azure SDK
+    clients and credentials so the next call re-authenticates from scratch.
+
+    Returns:
+        Confirmation message
+    """
+    try:
+        clear_subscription_id()
+        reset_azure_credentials()
+        return (
+            "Azure account cache cleared successfully.\n"
+            "  - Runtime subscription override removed\n"
+            "  - Cached credentials cleared\n"
+            "  - Cached SDK clients cleared\n"
+            "\nNext Azure operation will re-authenticate."
+        )
+    except Exception as e:
+        error_msg = format_error_message(e, "Failed to clear account cache")
+        logger.error(error_msg)
+        return error_msg
+
+
+async def get_access_token(resource: str = "https://management.azure.com/.default") -> str:
+    """Get an Azure access token for the current credentials (similar to 'az account get-access-token').
+
+    Args:
+        resource: The resource/scope to obtain a token for.
+                  Default: https://management.azure.com/.default (Azure Resource Manager).
+
+    Returns:
+        Token information including the access token, expiry, subscription, and tenant.
+    """
+    try:
+        from datetime import datetime
+
+        credential = _get_azure_credential()
+        token = credential.get_token(resource)
+
+        subscription_id = get_subscription_id() or "Not configured"
+        tenant_id = config.azure_tenant_id or "N/A (using CLI/Managed Identity)"
+
+        expiry = datetime.fromtimestamp(token.expires_on)
+
+        # Mask the token for security — show first 8 and last 4 chars
+        token_value = token.token
+        if len(token_value) > 16:
+            masked_token = f"{token_value[:8]}...{token_value[-4:]}"
+        else:
+            masked_token = "****"
+
+        return (
+            f"Azure Access Token:\n"
+            f"{'='*50}\n"
+            f"Token (masked): {masked_token}\n"
+            f"Token Length: {len(token_value)} chars\n"
+            f"Expires On: {expiry.isoformat()}\n"
+            f"Subscription: {subscription_id}\n"
+            f"Tenant: {tenant_id}\n"
+            f"Resource: {resource}\n"
+            f"Token Type: Bearer\n"
+            f"\nNote: Full token is not shown for security. "
+            f"Use this tool programmatically if you need the raw token."
+        )
+
+    except ImportError as e:
+        return str(e)
+    except Exception as e:
+        error_msg = format_error_message(e, "Failed to get access token")
+        logger.error(error_msg)
+        return error_msg
+
+
 async def get_tenant_info() -> str:
     """Get Azure tenant information (similar to 'az account tenant list').
     

@@ -21,21 +21,21 @@ nav_order: 1
 ### Key Capabilities
 
 - **Subscription Management** — List, switch, and inspect Azure subscriptions and tenants
-- **Resource Groups** — Create, delete, tag, and list resource groups
+- **Account Operations** — View subscription details, get access tokens, clear cached credentials
+- **Resource Groups** — List and inspect resource groups
 - **Virtual Machines** — Start, stop, restart, deallocate VMs and scale VMSS
 - **Storage Accounts** — List and inspect storage account status
-- **Governance** — Management groups, RBAC role assignments, resource locks
+- **Governance** — Management groups, RBAC role definitions, resource locks
 - **Auditing** — Query Azure Activity Log for recent changes
 - **Health Monitoring** — Server health checks and Azure SDK availability
 
 ### How It Works
 
 ```
-                                                          on startup
-┌──────────────┐       MCP (stdio)       ┌──────────────┐ ─────────► ┌─────────────────┐
-│  AI Assistant │  ◄──────────────────►  │  azops-mcp   │            │ License Server  │
-│  (Cursor,     │   JSON-RPC messages    │  MCP Server   │ ◄──────── │ (validates keys) │
-│   Claude, …)  │                        │               │  features └─────────────────┘
+┌──────────────┐       MCP (stdio)       ┌──────────────┐
+│  AI Assistant │  ◄──────────────────►  │  azops-mcp   │
+│  (Cursor,     │   JSON-RPC messages    │  MCP Server   │
+│   Claude, …)  │                        │               │
 └──────────────┘                         └───────┬───────┘
                                                  │
                                           Azure SDK REST
@@ -46,16 +46,23 @@ nav_order: 1
                                           └─────────────┘
 ```
 
-The server runs locally as a subprocess of your AI client. On startup it validates the `AUTH_TOKEN` against a **license server** to determine which features are available. Free-tier tools (read-only) are always registered. Premium tools (write/mutate) only appear when the license grants the corresponding feature flag — without a valid token, premium tools are completely invisible to the AI client.
+The server runs locally as a subprocess of your AI client. It communicates over **stdio** using the Model Context Protocol and calls Azure SDK operations on your behalf using your local credentials (`az login`) or a configured Service Principal.
 
-### Free & Premium Tiers
+### 26 Tools
 
-| Tier | What you get |
-|:-----|:-------------|
-| **Free** | 23 read-only and operational tools — no token needed |
-| **Premium** | 8 additional write/mutate tools — requires a validated `AUTH_TOKEN` |
+| Category | Count | Examples |
+|:---------|:------|:--------|
+| Health & Status | 1 | `health_check` |
+| Subscriptions & Auth | 8 | `list_subscriptions`, `auth_status`, `account_show`, `account_get_access_token` |
+| Management Groups | 2 | `list_management_groups`, `get_management_group` |
+| RBAC | 1 | `list_role_definitions` |
+| Locks & Tags | 2 | `list_resource_locks`, `list_tags` |
+| Activity Log | 1 | `get_activity_log` |
+| Resource Groups | 2 | `list_resource_groups`, `list_resources` |
+| Virtual Machines | 7 | `start_vm`, `stop_vm`, `deallocate_vm`, `scale_vmss` |
+| Storage | 2 | `list_storage_accounts`, `get_storage_status` |
 
-Premium tools are **not registered** without a valid license. They don't show up in `tools/list`, the LLM never sees them, and there is no "access denied" leakage. See [Authentication](/azops-mcp/authentication) for details.
+See the [Tools Reference](/azops-mcp/tools-reference) for full details on every tool.
 
 ## Project Structure
 
@@ -63,22 +70,15 @@ Premium tools are **not registered** without a valid license. They don't show up
 azops-mcp/
 ├── src/azops_mcp/
 │   ├── __main__.py          # Module entry point
-│   ├── server.py            # MCP server — free tools + conditional premium registration
+│   ├── server.py            # MCP server — all 26 tool definitions
 │   ├── config.py            # ServerConfig dataclass & env loading
 │   ├── tools/
 │   │   └── cloud.py         # Azure SDK integrations (all Azure calls)
 │   └── utils/
-│       ├── auth.py          # Remote license validation & caching
 │       └── helpers.py       # HTTP client, error formatting
-├── license-server/          # License validation microservice
-│   ├── main.py              # FastAPI app (POST /v1/license/validate)
-│   ├── generate_license.py  # CLI tool to create license keys
-│   ├── licenses.json        # Token-hash → license mapping (the "database")
-│   ├── Dockerfile           # Container image for the license server
-│   └── requirements.txt     # FastAPI + uvicorn
 ├── tests/                   # pytest test suite
 ├── Dockerfile               # Container image for the MCP server
-├── docker-compose.yml       # Local dev: both services
+├── docker-compose.yml       # Docker Compose for the MCP server
 ├── pyproject.toml           # Project metadata & dependencies
 ├── quickstart.sh            # One-command setup script
 └── .env.example             # Configuration template

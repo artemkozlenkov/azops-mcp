@@ -28,7 +28,7 @@ Get azops-mcp running in under five minutes.
 
 You need to be authenticated with Azure CLI (`az login`) **or** have Service Principal credentials ready.
 
-For Docker-based development you also need Docker (or Podman) with Compose v2.
+For Docker-based usage you also need Docker (or Podman) with Compose v2.
 
 ---
 
@@ -56,7 +56,7 @@ cp .env.example .env
 
 Edit `.env` to set at least `AZURE_SUBSCRIPTION_ID`, or leave it blank and use the `set_subscription` tool in chat.
 
-### Option C: Docker Compose
+### Option C: Docker
 
 If you prefer containers, see the [Docker](/azops-mcp/docker) page for full instructions. The short version:
 
@@ -64,27 +64,9 @@ If you prefer containers, see the [Docker](/azops-mcp/docker) page for full inst
 git clone https://github.com/artemkozlenkov/azops-mcp.git
 cd azops-mcp
 cp .env.example .env          # edit with your credentials
-docker compose up              # starts the license server
-docker compose run --rm mcp-server   # run the MCP server interactively
+docker compose build
+docker compose run --rm mcp-server
 ```
-
----
-
-## Enable Premium Features (Optional)
-
-By default the server runs in **free tier** (23 read-only tools). To unlock premium write operations you need two things:
-
-1. **A license server** — either self-host from `license-server/` or use a hosted endpoint
-2. **An AUTH_TOKEN** — generated via `python license-server/generate_license.py`
-
-Add both to your `.env`:
-
-```env
-AUTH_TOKEN=azops_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-LICENSE_API_URL=http://localhost:8000
-```
-
-See [Authentication](/azops-mcp/authentication) for the full walkthrough.
 
 ---
 
@@ -157,7 +139,7 @@ The assistant calls the corresponding MCP tools and returns the results inline.
 ## Next Steps
 
 - [Architecture](/azops-mcp/architecture) — understand how the server works internally
-- [Authentication](/azops-mcp/authentication) — configure Service Principal or license tokens
+- [Authentication](/azops-mcp/authentication) — configure Service Principal or managed identity
 - [Tools Reference](/azops-mcp/tools-reference) — full list of every available tool
 - [Configuration](/azops-mcp/configuration) — all environment variables and defaults
-- [Docker](/azops-mcp/docker) — run everything with Docker Compose
+- [Docker](/azops-mcp/docker) — run with Docker Compose

@@ -11,7 +11,7 @@ from typing import Any, Dict, Optional
 from mcp.server.fastmcp import FastMCP
 
 from .config import config
-from .tools import cloud
+from .tools import acr, cloud
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -51,6 +51,11 @@ async def health_check() -> Dict[str, Any]:
             ("azure-mgmt-storage", "azure.mgmt.storage"),
             ("azure-mgmt-subscription", "azure.mgmt.subscription"),
             ("azure-mgmt-managementgroups", "azure.mgmt.managementgroups"),
+            ("azure-mgmt-appconfiguration", "azure.mgmt.appconfiguration"),
+            ("azure-appconfiguration", "azure.appconfiguration"),
+            ("azure-mgmt-web", "azure.mgmt.web"),
+            ("azure-mgmt-network", "azure.mgmt.network"),
+            ("azure-mgmt-containerregistry", "azure.mgmt.containerregistry"),
         ]:
             try:
                 __import__(path)
@@ -148,6 +153,392 @@ async def account_get_access_token(resource: str = "https://management.azure.com
         return await cloud.get_access_token(resource)
     except Exception as e:
         logger.error("account_get_access_token failed: %s", e)
+        return f"Error: {e}"
+
+
+# -- 14. Azure Container Registry (ACR) --------------------------------------
+
+
+@mcp.tool()
+async def acr_list_registries(resource_group: str = "") -> str:
+    """List container registries in a resource group or subscription.
+
+    Args:
+        resource_group: Optional resource group name to filter by
+    """
+    logger.info("acr_list_registries: %s", resource_group or "subscription")
+    try:
+        return await acr.acr_list_registries(resource_group)
+    except Exception as e:
+        logger.error("acr_list_registries failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def acr_show_registry(resource_group: str, registry_name: str) -> str:
+    """Get details of a container registry.
+
+    Args:
+        resource_group: Resource group name
+        registry_name: Name of the container registry
+    """
+    logger.info("acr_show_registry: %s/%s", resource_group, registry_name)
+    if not registry_name or not resource_group:
+        return "Error: registry_name and resource_group are required"
+    try:
+        return await acr.acr_show_registry(resource_group, registry_name)
+    except Exception as e:
+        logger.error("acr_show_registry failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def acr_create_registry(
+    resource_group: str,
+    registry_name: str,
+    location: str = "eastus",
+    sku: str = "Basic",
+    admin_enabled: bool = False,
+) -> str:
+    """Create a new container registry.
+
+    Args:
+        resource_group: Resource group name
+        registry_name: Name of the container registry (must be unique across Azure)
+        location: Azure region (default: eastus)
+        sku: Sku tier - Basic, Standard, Premium (default: Basic)
+        admin_enabled: Enable admin user (default: False)
+    """
+    logger.info("acr_create_registry: %s/%s sku=%s admin=%s", resource_group, registry_name, sku, admin_enabled)
+    if not registry_name or not resource_group:
+        return "Error: registry_name and resource_group are required"
+    try:
+        return await acr.acr_create_registry(resource_group, registry_name, location, sku, admin_enabled)
+    except Exception as e:
+        logger.error("acr_create_registry failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def acr_delete_registry(resource_group: str, registry_name: str) -> str:
+    """Delete a container registry.
+
+    Args:
+        resource_group: Resource group name
+        registry_name: Name of the container registry
+    """
+    logger.info("acr_delete_registry: %s/%s", resource_group, registry_name)
+    if not registry_name or not resource_group:
+        return "Error: registry_name and resource_group are required"
+    try:
+        return await acr.acr_delete_registry(resource_group, registry_name)
+    except Exception as e:
+        logger.error("acr_delete_registry failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def acr_update_registry(
+    resource_group: str,
+    registry_name: str,
+    admin_enabled: bool = None,
+) -> str:
+    """Update a container registry.
+
+    Args:
+        resource_group: Resource group name
+        registry_name: Name of the container registry
+        admin_enabled: Enable or disable admin user (optional)
+    """
+    logger.info("acr_update_registry: %s/%s admin=%s", resource_group, registry_name, admin_enabled)
+    if not registry_name or not resource_group:
+        return "Error: registry_name and resource_group are required"
+    try:
+        return await acr.acr_update_registry(resource_group, registry_name, admin_enabled, None)
+    except Exception as e:
+        logger.error("acr_update_registry failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def acr_get_credentials(resource_group: str, registry_name: str) -> str:
+    """Get login credentials for a container registry.
+
+    Args:
+        resource_group: Resource group name
+        registry_name: Name of the container registry
+    """
+    logger.info("acr_get_credentials: %s/%s", resource_group, registry_name)
+    if not registry_name or not resource_group:
+        return "Error: registry_name and resource_group are required"
+    try:
+        return await acr.acr_get_credentials(resource_group, registry_name)
+    except Exception as e:
+        logger.error("acr_get_credentials failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def acr_get_login_server(resource_group: str, registry_name: str) -> str:
+    """Get the login server URL for a container registry.
+
+    Args:
+        resource_group: Resource group name
+        registry_name: Name of the container registry
+    """
+    logger.info("acr_get_login_server: %s/%s", resource_group, registry_name)
+    if not registry_name or not resource_group:
+        return "Error: registry_name and resource_group are required"
+    try:
+        return await acr.acr_get_login_server(resource_group, registry_name)
+    except Exception as e:
+        logger.error("acr_get_login_server failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def acr_list_repositories(resource_group: str, registry_name: str) -> str:
+    """List repositories in a container registry.
+
+    Args:
+        resource_group: Resource group name
+        registry_name: Name of the container registry
+    """
+    logger.info("acr_list_repositories: %s/%s", resource_group, registry_name)
+    if not registry_name or not resource_group:
+        return "Error: registry_name and resource_group are required"
+    try:
+        return await acr.acr_list_repositories(resource_group, registry_name)
+    except Exception as e:
+        logger.error("acr_list_repositories failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def acr_list_tags(resource_group: str, registry_name: str, repository: str) -> str:
+    """List tags in a container registry repository.
+
+    Args:
+        resource_group: Resource group name
+        registry_name: Name of the container registry
+        repository: Repository name
+    """
+    logger.info("acr_list_tags: %s/%s/%s", resource_group, registry_name, repository)
+    if not registry_name or not resource_group or not repository:
+        return "Error: registry_name, resource_group, and repository are required"
+    try:
+        return await acr.acr_list_tags(resource_group, registry_name, repository)
+    except Exception as e:
+        logger.error("acr_list_tags failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def acr_show_task(resource_group: str, registry_name: str, task_name: str) -> str:
+    """Get details of a container registry task.
+
+    Args:
+        resource_group: Resource group name
+        registry_name: Name of the container registry
+        task_name: Name of the task
+    """
+    logger.info("acr_show_task: %s/%s/%s", resource_group, registry_name, task_name)
+    if not registry_name or not resource_group or not task_name:
+        return "Error: registry_name, resource_group, and task_name are required"
+    try:
+        return await acr.acr_show_task(resource_group, registry_name, task_name)
+    except Exception as e:
+        logger.error("acr_show_task failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def acr_list_tasks(resource_group: str, registry_name: str) -> str:
+    """List tasks in a container registry.
+
+    Args:
+        resource_group: Resource group name
+        registry_name: Name of the container registry
+    """
+    logger.info("acr_list_tasks: %s/%s", resource_group, registry_name)
+    if not registry_name or not resource_group:
+        return "Error: registry_name and resource_group are required"
+    try:
+        return await acr.acr_list_tasks(resource_group, registry_name)
+    except Exception as e:
+        logger.error("acr_list_tasks failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def acr_create_task(
+    resource_group: str,
+    registry_name: str,
+    task_name: str,
+    platform_os: str = "Linux",
+    platform_architecture: str = "amd64",
+    platform_variant: str = "",
+) -> str:
+    """Create a container registry task.
+
+    Args:
+        resource_group: Resource group name
+        registry_name: Name of the container registry
+        task_name: Name of the task
+        platform_os: Platform OS - Linux or Windows (default: Linux)
+        platform_architecture: Platform architecture (default: amd64)
+        platform_variant: Platform variant (optional)
+    """
+    logger.info("acr_create_task: %s/%s/%s os=%s arch=%s", resource_group, registry_name, task_name, platform_os, platform_architecture)
+    if not registry_name or not resource_group or not task_name:
+        return "Error: registry_name, resource_group, and task_name are required"
+    try:
+        return await acr.acr_create_task(resource_group, registry_name, task_name, platform_os, platform_architecture, platform_variant)
+    except Exception as e:
+        logger.error("acr_create_task failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def acr_delete_task(resource_group: str, registry_name: str, task_name: str) -> str:
+    """Delete a container registry task.
+
+    Args:
+        resource_group: Resource group name
+        registry_name: Name of the container registry
+        task_name: Name of the task
+    """
+    logger.info("acr_delete_task: %s/%s/%s", resource_group, registry_name, task_name)
+    if not registry_name or not resource_group or not task_name:
+        return "Error: registry_name, resource_group, and task_name are required"
+    try:
+        return await acr.acr_delete_task(resource_group, registry_name, task_name)
+    except Exception as e:
+        logger.error("acr_delete_task failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def acr_run_task(resource_group: str, registry_name: str, task_name: str) -> str:
+    """Run a container registry task.
+
+    Args:
+        resource_group: Resource group name
+        registry_name: Name of the container registry
+        task_name: Name of the task
+    """
+    logger.info("acr_run_task: %s/%s/%s", resource_group, registry_name, task_name)
+    if not registry_name or not resource_group or not task_name:
+        return "Error: registry_name, resource_group, and task_name are required"
+    try:
+        return await acr.acr_run_task(resource_group, registry_name, task_name)
+    except Exception as e:
+        logger.error("acr_run_task failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def acr_list_builds(resource_group: str = "", registry_name: str = "") -> str:
+    """List build tasks in a subscription or specific registry.
+
+    Args:
+        resource_group: Resource group containing build runners (optional)
+        registry_name: Name of the container registry (optional)
+    """
+    logger.info("acr_list_builds: %s", registry_name or "subscription")
+    try:
+        return await acr.acr_list_builds(resource_group, registry_name)
+    except Exception as e:
+        logger.error("acr_list_builds failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def acr_show_quotas(resource_group: str, registry_name: str) -> str:
+    """Show quota information for a container registry.
+
+    Args:
+        resource_group: Resource group name
+        registry_name: Name of the container registry
+    """
+    logger.info("acr_show_quotas: %s/%s", resource_group, registry_name)
+    if not registry_name or not resource_group:
+        return "Error: registry_name and resource_group are required"
+    try:
+        return await acr.acr_show_quotas(resource_group, registry_name)
+    except Exception as e:
+        logger.error("acr_show_quotas failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def acr_show_usage(resource_group: str, registry_name: str) -> str:
+    """Show usage information for a container registry.
+
+    Args:
+        resource_group: Resource group name
+        registry_name: Name of the container registry
+    """
+    logger.info("acr_show_usage: %s/%s", resource_group, registry_name)
+    if not registry_name or not resource_group:
+        return "Error: registry_name and resource_group are required"
+    try:
+        return await acr.acr_show_usage(resource_group, registry_name)
+    except Exception as e:
+        logger.error("acr_show_usage failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def acr_list_network_rules(resource_group: str, registry_name: str) -> str:
+    """List network rules for a container registry.
+
+    Args:
+        resource_group: Resource group name
+        registry_name: Name of the container registry
+    """
+    logger.info("acr_list_network_rules: %s/%s", resource_group, registry_name)
+    if not registry_name or not resource_group:
+        return "Error: registry_name and resource_group are required"
+    try:
+        return await acr.acr_list_network_rules(resource_group, registry_name)
+    except Exception as e:
+        logger.error("acr_list_network_rules failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def acr_update_network_rules(
+    resource_group: str,
+    registry_name: str,
+    default_action: str = "Allow",
+) -> str:
+    """Update network rules for a container registry.
+
+    Args:
+        resource_group: Resource group name
+        registry_name: Name of the container registry
+        default_action: Default action - Allow or Deny (default: Allow)
+    """
+    logger.info("acr_update_network_rules: %s/%s action=%s", resource_group, registry_name, default_action)
+    if not registry_name or not resource_group:
+        return "Error: registry_name and resource_group are required"
+    try:
+        return await acr.acr_update_network_rules(resource_group, registry_name, default_action)
+    except Exception as e:
+        logger.error("acr_update_network_rules failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def acr_reset_client() -> str:
+    """Reset cached ACR client and force re-authentication."""
+    logger.info("acr_reset_client called")
+    try:
+        acr.reset_acr_client()
+        return "ACR client cache cleared"
+    except Exception as e:
+        logger.error("acr_reset_client failed: %s", e)
         return f"Error: {e}"
 
 
@@ -477,6 +868,414 @@ async def get_storage_status(resource_group: str, account_name: str) -> str:
         return f"Error: {e}"
 
 
+
+# -- 11. App Configuration ----------------------------------------------------
+
+
+@mcp.tool()
+async def appconfig_list(resource_group: str = "") -> str:
+    """List App Configuration stores in the subscription or resource group.
+
+    Args:
+        resource_group: Optional resource group to filter by
+    """
+    logger.info("appconfig_list: %s", resource_group or "subscription")
+    try:
+        return await cloud.appconfig_list(resource_group)
+    except Exception as e:
+        logger.error("appconfig_list failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def appconfig_show(store_name: str, resource_group: str) -> str:
+    """Show details of an App Configuration store.
+
+    Args:
+        store_name: Name of the App Configuration store
+        resource_group: Resource group containing the store
+    """
+    logger.info("appconfig_show: %s/%s", resource_group, store_name)
+    if not store_name or not resource_group:
+        return "Error: store_name and resource_group are required"
+    try:
+        return await cloud.appconfig_show(store_name, resource_group)
+    except Exception as e:
+        logger.error("appconfig_show failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def appconfig_kv_list(store_name: str, resource_group: str = "", key_filter: str = "*", label_filter: str = "") -> str:
+    """List key-values in an App Configuration store.
+
+    Args:
+        store_name: Name of the App Configuration store
+        resource_group: Optional resource group (speeds up lookup)
+        key_filter: Key pattern filter (default '*' for all, supports '*' wildcard)
+        label_filter: Optional label filter
+    """
+    logger.info("appconfig_kv_list: store=%s, key=%s", store_name, key_filter)
+    if not store_name:
+        return "Error: store_name is required"
+    try:
+        return await cloud.appconfig_kv_list(store_name, resource_group, key_filter, label_filter)
+    except Exception as e:
+        logger.error("appconfig_kv_list failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def appconfig_kv_show(store_name: str, key: str, resource_group: str = "", label: str = "") -> str:
+    """Show a specific key-value from an App Configuration store.
+
+    Args:
+        store_name: Name of the App Configuration store
+        key: The configuration key to retrieve
+        resource_group: Optional resource group
+        label: Optional label (default: no label)
+    """
+    logger.info("appconfig_kv_show: store=%s, key=%s", store_name, key)
+    if not store_name or not key:
+        return "Error: store_name and key are required"
+    try:
+        return await cloud.appconfig_kv_show(store_name, key, resource_group, label)
+    except Exception as e:
+        logger.error("appconfig_kv_show failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def appconfig_kv_set(store_name: str, key: str, value: str, resource_group: str = "", label: str = "", content_type: str = "") -> str:
+    """Set a key-value in an App Configuration store.
+
+    Args:
+        store_name: Name of the App Configuration store
+        key: The configuration key
+        value: The value to set
+        resource_group: Optional resource group
+        label: Optional label
+        content_type: Optional content type (e.g. 'application/json')
+    """
+    logger.info("appconfig_kv_set: store=%s, key=%s", store_name, key)
+    if not store_name or not key:
+        return "Error: store_name and key are required"
+    try:
+        return await cloud.appconfig_kv_set(store_name, key, value, resource_group, label, content_type)
+    except Exception as e:
+        logger.error("appconfig_kv_set failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def appconfig_kv_delete(store_name: str, key: str, resource_group: str = "", label: str = "") -> str:
+    """Delete a key-value from an App Configuration store.
+
+    Args:
+        store_name: Name of the App Configuration store
+        key: The configuration key to delete
+        resource_group: Optional resource group
+        label: Optional label
+    """
+    logger.info("appconfig_kv_delete: store=%s, key=%s", store_name, key)
+    if not store_name or not key:
+        return "Error: store_name and key are required"
+    try:
+        return await cloud.appconfig_kv_delete(store_name, key, resource_group, label)
+    except Exception as e:
+        logger.error("appconfig_kv_delete failed: %s", e)
+        return f"Error: {e}"
+
+
+# -- 12. App Service -----------------------------------------------------------
+
+
+@mcp.tool()
+async def appservice_plan_list(resource_group: str = "") -> str:
+    """List App Service plans in the subscription or resource group.
+
+    Args:
+        resource_group: Optional resource group to filter by
+    """
+    logger.info("appservice_plan_list: %s", resource_group or "subscription")
+    try:
+        return await cloud.appservice_plan_list(resource_group)
+    except Exception as e:
+        logger.error("appservice_plan_list failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def appservice_plan_show(name: str, resource_group: str) -> str:
+    """Show details of an App Service plan.
+
+    Args:
+        name: App Service plan name
+        resource_group: Resource group containing the plan
+    """
+    logger.info("appservice_plan_show: %s/%s", resource_group, name)
+    if not name or not resource_group:
+        return "Error: name and resource_group are required"
+    try:
+        return await cloud.appservice_plan_show(name, resource_group)
+    except Exception as e:
+        logger.error("appservice_plan_show failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def webapp_list(resource_group: str = "") -> str:
+    """List web apps in the subscription or resource group.
+
+    Args:
+        resource_group: Optional resource group to filter by
+    """
+    logger.info("webapp_list: %s", resource_group or "subscription")
+    try:
+        return await cloud.webapp_list(resource_group)
+    except Exception as e:
+        logger.error("webapp_list failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def webapp_show(name: str, resource_group: str) -> str:
+    """Show details of a web app.
+
+    Args:
+        name: Web app name
+        resource_group: Resource group containing the web app
+    """
+    logger.info("webapp_show: %s/%s", resource_group, name)
+    if not name or not resource_group:
+        return "Error: name and resource_group are required"
+    try:
+        return await cloud.webapp_show(name, resource_group)
+    except Exception as e:
+        logger.error("webapp_show failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def webapp_start(name: str, resource_group: str) -> str:
+    """Start a web app.
+
+    Args:
+        name: Web app name
+        resource_group: Resource group containing the web app
+    """
+    logger.info("webapp_start: %s/%s", resource_group, name)
+    if not name or not resource_group:
+        return "Error: name and resource_group are required"
+    try:
+        return await cloud.webapp_start(name, resource_group)
+    except Exception as e:
+        logger.error("webapp_start failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def webapp_stop(name: str, resource_group: str) -> str:
+    """Stop a web app.
+
+    Args:
+        name: Web app name
+        resource_group: Resource group containing the web app
+    """
+    logger.info("webapp_stop: %s/%s", resource_group, name)
+    if not name or not resource_group:
+        return "Error: name and resource_group are required"
+    try:
+        return await cloud.webapp_stop(name, resource_group)
+    except Exception as e:
+        logger.error("webapp_stop failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def webapp_restart(name: str, resource_group: str) -> str:
+    """Restart a web app.
+
+    Args:
+        name: Web app name
+        resource_group: Resource group containing the web app
+    """
+    logger.info("webapp_restart: %s/%s", resource_group, name)
+    if not name or not resource_group:
+        return "Error: name and resource_group are required"
+    try:
+        return await cloud.webapp_restart(name, resource_group)
+    except Exception as e:
+        logger.error("webapp_restart failed: %s", e)
+        return f"Error: {e}"
+
+
+# -- 13. Virtual Networks ------------------------------------------------------
+
+
+@mcp.tool()
+async def vnet_list(resource_group: str = "") -> str:
+    """List virtual networks in the subscription or resource group.
+
+    Args:
+        resource_group: Optional resource group to filter by
+    """
+    logger.info("vnet_list: %s", resource_group or "subscription")
+    try:
+        return await cloud.vnet_list(resource_group)
+    except Exception as e:
+        logger.error("vnet_list failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def vnet_show(name: str, resource_group: str) -> str:
+    """Show details of a virtual network including subnets and peerings.
+
+    Args:
+        name: Virtual network name
+        resource_group: Resource group containing the VNet
+    """
+    logger.info("vnet_show: %s/%s", resource_group, name)
+    if not name or not resource_group:
+        return "Error: name and resource_group are required"
+    try:
+        return await cloud.vnet_show(name, resource_group)
+    except Exception as e:
+        logger.error("vnet_show failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def vnet_create(name: str, resource_group: str, address_prefix: str = "10.0.0.0/16", location: str = "") -> str:
+    """Create a virtual network with a default subnet.
+
+    Args:
+        name: Virtual network name
+        resource_group: Resource group to create the VNet in
+        address_prefix: Address space CIDR (default 10.0.0.0/16)
+        location: Azure region (defaults to resource group location)
+    """
+    logger.info("vnet_create: %s/%s prefix=%s", resource_group, name, address_prefix)
+    if not name or not resource_group:
+        return "Error: name and resource_group are required"
+    try:
+        return await cloud.vnet_create(name, resource_group, address_prefix, location)
+    except Exception as e:
+        logger.error("vnet_create failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def vnet_delete(name: str, resource_group: str) -> str:
+    """Delete a virtual network. WARNING: removes all subnets and peerings.
+
+    Args:
+        name: Virtual network name
+        resource_group: Resource group containing the VNet
+    """
+    logger.info("vnet_delete: %s/%s", resource_group, name)
+    if not name or not resource_group:
+        return "Error: name and resource_group are required"
+    try:
+        return await cloud.vnet_delete(name, resource_group)
+    except Exception as e:
+        logger.error("vnet_delete failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def vnet_subnet_list(vnet_name: str, resource_group: str) -> str:
+    """List subnets in a virtual network.
+
+    Args:
+        vnet_name: Virtual network name
+        resource_group: Resource group containing the VNet
+    """
+    logger.info("vnet_subnet_list: %s/%s", resource_group, vnet_name)
+    if not vnet_name or not resource_group:
+        return "Error: vnet_name and resource_group are required"
+    try:
+        return await cloud.vnet_subnet_list(vnet_name, resource_group)
+    except Exception as e:
+        logger.error("vnet_subnet_list failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def vnet_subnet_show(vnet_name: str, subnet_name: str, resource_group: str) -> str:
+    """Show details of a subnet including NSG, route table, and delegations.
+
+    Args:
+        vnet_name: Virtual network name
+        subnet_name: Subnet name
+        resource_group: Resource group containing the VNet
+    """
+    logger.info("vnet_subnet_show: %s/%s/%s", resource_group, vnet_name, subnet_name)
+    if not vnet_name or not subnet_name or not resource_group:
+        return "Error: vnet_name, subnet_name, and resource_group are required"
+    try:
+        return await cloud.vnet_subnet_show(vnet_name, subnet_name, resource_group)
+    except Exception as e:
+        logger.error("vnet_subnet_show failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def vnet_subnet_create(vnet_name: str, subnet_name: str, resource_group: str, address_prefix: str) -> str:
+    """Create a subnet in a virtual network.
+
+    Args:
+        vnet_name: Virtual network name
+        subnet_name: Name for the new subnet
+        resource_group: Resource group containing the VNet
+        address_prefix: Subnet CIDR (e.g. 10.0.1.0/24)
+    """
+    logger.info("vnet_subnet_create: %s/%s/%s prefix=%s", resource_group, vnet_name, subnet_name, address_prefix)
+    if not vnet_name or not subnet_name or not resource_group or not address_prefix:
+        return "Error: vnet_name, subnet_name, resource_group, and address_prefix are required"
+    try:
+        return await cloud.vnet_subnet_create(vnet_name, subnet_name, resource_group, address_prefix)
+    except Exception as e:
+        logger.error("vnet_subnet_create failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def vnet_subnet_delete(vnet_name: str, subnet_name: str, resource_group: str) -> str:
+    """Delete a subnet from a virtual network.
+
+    Args:
+        vnet_name: Virtual network name
+        subnet_name: Subnet name to delete
+        resource_group: Resource group containing the VNet
+    """
+    logger.info("vnet_subnet_delete: %s/%s/%s", resource_group, vnet_name, subnet_name)
+    if not vnet_name or not subnet_name or not resource_group:
+        return "Error: vnet_name, subnet_name, and resource_group are required"
+    try:
+        return await cloud.vnet_subnet_delete(vnet_name, subnet_name, resource_group)
+    except Exception as e:
+        logger.error("vnet_subnet_delete failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def vnet_peering_list(vnet_name: str, resource_group: str) -> str:
+    """List peerings for a virtual network.
+
+    Args:
+        vnet_name: Virtual network name
+        resource_group: Resource group containing the VNet
+    """
+    logger.info("vnet_peering_list: %s/%s", resource_group, vnet_name)
+    if not vnet_name or not resource_group:
+        return "Error: vnet_name and resource_group are required"
+    try:
+        return await cloud.vnet_peering_list(vnet_name, resource_group)
+    except Exception as e:
+        logger.error("vnet_peering_list failed: %s", e)
+        return f"Error: {e}"
 
 
 # =============================================================================

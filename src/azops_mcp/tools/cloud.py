@@ -13,6 +13,10 @@ _azure_credential = None
 _compute_client = None
 _resource_client = None
 _storage_client = None
+_appconfig_mgmt_client = None
+_appconfig_data_clients: Dict[str, Any] = {}  # keyed by store endpoint
+_web_client = None
+_network_client = None
 
 # Runtime configuration (can be set via chat)
 _runtime_config: Dict[str, Optional[str]] = {
@@ -23,12 +27,17 @@ _runtime_config: Dict[str, Optional[str]] = {
 def set_subscription_id(subscription_id: str) -> None:
     """Set the active subscription ID at runtime."""
     global _runtime_config, _compute_client, _resource_client, _storage_client, _subscription_client
+    global _appconfig_mgmt_client, _appconfig_data_clients, _web_client, _network_client
     _runtime_config["subscription_id"] = subscription_id
     # Clear cached clients so they use the new subscription
     _compute_client = None
     _resource_client = None
     _storage_client = None
     _subscription_client = None
+    _appconfig_mgmt_client = None
+    _appconfig_data_clients = {}
+    _web_client = None
+    _network_client = None
     logger.info(f"Subscription ID set to: {subscription_id}")
 
 
@@ -86,11 +95,16 @@ def _get_azure_credential():
 def reset_azure_credentials():
     """Reset cached Azure credentials (useful after re-authentication)."""
     global _azure_credential, _compute_client, _resource_client, _storage_client, _subscription_client
+    global _appconfig_mgmt_client, _appconfig_data_clients, _web_client, _network_client
     _azure_credential = None
     _compute_client = None
     _resource_client = None
     _storage_client = None
     _subscription_client = None
+    _appconfig_mgmt_client = None
+    _appconfig_data_clients = {}
+    _web_client = None
+    _network_client = None
     logger.info("Azure credentials cache cleared")
 
 
@@ -1357,6 +1371,985 @@ async def get_access_token(resource: str = "https://management.azure.com/.defaul
         return str(e)
     except Exception as e:
         error_msg = format_error_message(e, "Failed to get access token")
+        logger.error(error_msg)
+        return error_msg
+
+
+# =============================================================================
+# App Configuration — management + data plane
+# =============================================================================
+
+
+def _get_appconfig_mgmt_client():
+    """Get Azure App Configuration Management client."""
+    global _appconfig_mgmt_client
+    if _appconfig_mgmt_client is None:
+        try:
+            from azure.mgmt.appconfiguration import AppConfigurationManagementClient
+
+            subscription_id = get_subscription_id()
+            if not subscription_id:
+                raise ValueError("Subscription ID not configured")
+
+            _appconfig_mgmt_client = AppConfigurationManagementClient(
+                credential=_get_azure_credential(),
+                subscription_id=subscription_id,
+            )
+        except ImportError:
+            raise ImportError("Azure App Configuration SDK not installed. Run: pip install azure-mgmt-appconfiguration")
+    return _appconfig_mgmt_client
+
+
+def _get_appconfig_data_client(endpoint: str):
+    """Get Azure App Configuration data-plane client for a specific store."""
+    global _appconfig_data_clients
+    if endpoint not in _appconfig_data_clients:
+        try:
+            from azure.appconfiguration import AzureAppConfigurationClient
+
+            _appconfig_data_clients[endpoint] = AzureAppConfigurationClient(
+                base_url=endpoint,
+                credential=_get_azure_credential(),
+            )
+        except ImportError:
+            raise ImportError("Azure App Configuration data SDK not installed. Run: pip install azure-appconfiguration")
+    return _appconfig_data_clients[endpoint]
+
+
+async def _resolve_appconfig_endpoint(store_name: str, resource_group: str = "") -> str:
+    """Resolve the endpoint URL for an App Configuration store.
+
+    If resource_group is given, fetches directly. Otherwise searches across
+    all stores in the subscription.
+    """
+    client = _get_appconfig_mgmt_client()
+
+    if resource_group:
+        store = client.configuration_stores.get(resource_group, store_name)
+        return store.endpoint
+    else:
+        # Search across all stores
+        stores = client.configuration_stores.list()
+        for store in stores:
+            if store.name == store_name:
+                return store.endpoint
+        raise ValueError(f"App Configuration store '{store_name}' not found in subscription")
+
+
+async def appconfig_list(resource_group: str = "") -> str:
+    """List App Configuration stores (similar to 'az appconfig list').
+
+    Args:
+        resource_group: Optional resource group to filter by
+
+    Returns:
+        Formatted list of App Configuration stores
+    """
+    try:
+        client = _get_appconfig_mgmt_client()
+
+        if resource_group:
+            stores = client.configuration_stores.list_by_resource_group(resource_group)
+        else:
+            stores = client.configuration_stores.list()
+
+        formatted = []
+        for store in stores:
+            sku = store.sku.name if store.sku else "N/A"
+            formatted.append(
+                f"Name: {store.name}\n"
+                f"Location: {store.location}\n"
+                f"Resource Group: {store.id.split('/')[4] if store.id else 'N/A'}\n"
+                f"Endpoint: {store.endpoint}\n"
+                f"SKU: {sku}\n"
+                f"Provisioning State: {store.provisioning_state}"
+            )
+
+        if not formatted:
+            scope = f"resource group '{resource_group}'" if resource_group else "subscription"
+            return f"No App Configuration stores found in {scope}."
+
+        return f"App Configuration Stores ({len(formatted)} found):\n\n" + "\n---\n".join(formatted)
+
+    except ImportError as e:
+        return str(e)
+    except Exception as e:
+        error_msg = format_error_message(e, "Failed to list App Configuration stores")
+        logger.error(error_msg)
+        return error_msg
+
+
+async def appconfig_show(store_name: str, resource_group: str) -> str:
+    """Show details of an App Configuration store (similar to 'az appconfig show').
+
+    Args:
+        store_name: Name of the App Configuration store
+        resource_group: Resource group containing the store
+
+    Returns:
+        Store details
+    """
+    try:
+        client = _get_appconfig_mgmt_client()
+        store = client.configuration_stores.get(resource_group, store_name)
+
+        sku = store.sku.name if store.sku else "N/A"
+        tags = ", ".join(f"{k}={v}" for k, v in (store.tags or {}).items()) or "None"
+
+        output = (
+            f"App Configuration Store:\n"
+            f"{'='*50}\n"
+            f"Name: {store.name}\n"
+            f"Location: {store.location}\n"
+            f"Resource Group: {resource_group}\n"
+            f"Endpoint: {store.endpoint}\n"
+            f"SKU: {sku}\n"
+            f"Provisioning State: {store.provisioning_state}\n"
+            f"Creation Date: {store.creation_date.isoformat() if store.creation_date else 'N/A'}\n"
+            f"Soft Delete Retention (days): {store.soft_delete_retention_in_days or 'N/A'}\n"
+            f"Public Network Access: {store.public_network_access or 'N/A'}\n"
+            f"Disable Local Auth: {store.disable_local_auth or False}\n"
+            f"Tags: {tags}\n"
+            f"ID: {store.id}"
+        )
+        return output
+
+    except ImportError as e:
+        return str(e)
+    except Exception as e:
+        error_msg = format_error_message(e, f"Failed to show App Configuration store '{store_name}'")
+        logger.error(error_msg)
+        return error_msg
+
+
+async def appconfig_kv_list(store_name: str, resource_group: str = "", key_filter: str = "*", label_filter: str = "") -> str:
+    """List key-values in an App Configuration store (similar to 'az appconfig kv list').
+
+    Args:
+        store_name: Name of the App Configuration store
+        resource_group: Optional resource group (speeds up endpoint lookup)
+        key_filter: Key filter pattern (default '*' for all). Supports '*' wildcard.
+        label_filter: Optional label filter
+
+    Returns:
+        Formatted list of key-value pairs
+    """
+    try:
+        endpoint = await _resolve_appconfig_endpoint(store_name, resource_group)
+        client = _get_appconfig_data_client(endpoint)
+
+        kwargs = {"key_filter": key_filter}
+        if label_filter:
+            kwargs["label_filter"] = label_filter
+
+        settings = client.list_configuration_settings(**kwargs)
+
+        formatted = []
+        count = 0
+        for setting in settings:
+            if count >= 50:
+                formatted.append("... (truncated, more key-values exist)")
+                break
+            value_preview = (setting.value or "")[:100]
+            if setting.value and len(setting.value) > 100:
+                value_preview += "..."
+            formatted.append(
+                f"Key: {setting.key}\n"
+                f"Value: {value_preview}\n"
+                f"Label: {setting.label or '(no label)'}\n"
+                f"Content Type: {setting.content_type or 'N/A'}\n"
+                f"Last Modified: {setting.last_modified.isoformat() if setting.last_modified else 'N/A'}"
+            )
+            count += 1
+
+        if not formatted:
+            return f"No key-values found in store '{store_name}' matching key='{key_filter}'."
+
+        return f"Key-Values in '{store_name}' ({count} shown):\n\n" + "\n---\n".join(formatted)
+
+    except ImportError as e:
+        return str(e)
+    except Exception as e:
+        error_msg = format_error_message(e, f"Failed to list key-values in '{store_name}'")
+        logger.error(error_msg)
+        return error_msg
+
+
+async def appconfig_kv_show(store_name: str, key: str, resource_group: str = "", label: str = "") -> str:
+    """Show a specific key-value in an App Configuration store (similar to 'az appconfig kv show').
+
+    Args:
+        store_name: Name of the App Configuration store
+        key: The configuration key to retrieve
+        resource_group: Optional resource group
+        label: Optional label (default: no label)
+
+    Returns:
+        Key-value details
+    """
+    try:
+        endpoint = await _resolve_appconfig_endpoint(store_name, resource_group)
+        client = _get_appconfig_data_client(endpoint)
+
+        setting = client.get_configuration_setting(key=key, label=label or None)
+
+        return (
+            f"App Configuration Key-Value:\n"
+            f"{'='*50}\n"
+            f"Key: {setting.key}\n"
+            f"Value: {setting.value}\n"
+            f"Label: {setting.label or '(no label)'}\n"
+            f"Content Type: {setting.content_type or 'N/A'}\n"
+            f"Last Modified: {setting.last_modified.isoformat() if setting.last_modified else 'N/A'}\n"
+            f"Read Only: {setting.read_only}\n"
+            f"ETag: {setting.etag or 'N/A'}"
+        )
+
+    except ImportError as e:
+        return str(e)
+    except Exception as e:
+        error_msg = format_error_message(e, f"Failed to get key '{key}' from '{store_name}'")
+        logger.error(error_msg)
+        return error_msg
+
+
+async def appconfig_kv_set(store_name: str, key: str, value: str, resource_group: str = "", label: str = "", content_type: str = "") -> str:
+    """Set a key-value in an App Configuration store (similar to 'az appconfig kv set').
+
+    Args:
+        store_name: Name of the App Configuration store
+        key: The configuration key
+        value: The value to set
+        resource_group: Optional resource group
+        label: Optional label
+        content_type: Optional content type (e.g. 'application/json')
+
+    Returns:
+        Confirmation with the set key-value
+    """
+    try:
+        endpoint = await _resolve_appconfig_endpoint(store_name, resource_group)
+        client = _get_appconfig_data_client(endpoint)
+
+        from azure.appconfiguration import ConfigurationSetting
+
+        setting = ConfigurationSetting(
+            key=key,
+            value=value,
+            label=label or None,
+            content_type=content_type or None,
+        )
+
+        result = client.set_configuration_setting(setting)
+
+        return (
+            f"Key-value set successfully in '{store_name}':\n"
+            f"{'='*50}\n"
+            f"Key: {result.key}\n"
+            f"Value: {result.value}\n"
+            f"Label: {result.label or '(no label)'}\n"
+            f"Last Modified: {result.last_modified.isoformat() if result.last_modified else 'N/A'}"
+        )
+
+    except ImportError as e:
+        return str(e)
+    except Exception as e:
+        error_msg = format_error_message(e, f"Failed to set key '{key}' in '{store_name}'")
+        logger.error(error_msg)
+        return error_msg
+
+
+async def appconfig_kv_delete(store_name: str, key: str, resource_group: str = "", label: str = "") -> str:
+    """Delete a key-value from an App Configuration store (similar to 'az appconfig kv delete').
+
+    Args:
+        store_name: Name of the App Configuration store
+        key: The configuration key to delete
+        resource_group: Optional resource group
+        label: Optional label
+
+    Returns:
+        Confirmation message
+    """
+    try:
+        endpoint = await _resolve_appconfig_endpoint(store_name, resource_group)
+        client = _get_appconfig_data_client(endpoint)
+
+        client.delete_configuration_setting(key=key, label=label or None)
+
+        label_info = f" (label='{label}')" if label else ""
+        return f"Key-value '{key}'{label_info} deleted from '{store_name}'."
+
+    except ImportError as e:
+        return str(e)
+    except Exception as e:
+        error_msg = format_error_message(e, f"Failed to delete key '{key}' from '{store_name}'")
+        logger.error(error_msg)
+        return error_msg
+
+
+# =============================================================================
+# App Service — plans & web apps
+# =============================================================================
+
+
+def _get_web_client():
+    """Get Azure Web Site Management client."""
+    global _web_client
+    if _web_client is None:
+        try:
+            from azure.mgmt.web import WebSiteManagementClient
+
+            subscription_id = get_subscription_id()
+            if not subscription_id:
+                raise ValueError("Subscription ID not configured")
+
+            _web_client = WebSiteManagementClient(
+                credential=_get_azure_credential(),
+                subscription_id=subscription_id,
+            )
+        except ImportError:
+            raise ImportError("Azure Web SDK not installed. Run: pip install azure-mgmt-web")
+    return _web_client
+
+
+async def appservice_plan_list(resource_group: str = "") -> str:
+    """List App Service plans (similar to 'az appservice plan list').
+
+    Args:
+        resource_group: Optional resource group to filter by
+
+    Returns:
+        Formatted list of App Service plans
+    """
+    try:
+        client = _get_web_client()
+
+        if resource_group:
+            plans = client.app_service_plans.list_by_resource_group(resource_group)
+        else:
+            plans = client.app_service_plans.list()
+
+        formatted = []
+        for plan in plans:
+            sku = f"{plan.sku.name} ({plan.sku.tier})" if plan.sku else "N/A"
+            formatted.append(
+                f"Name: {plan.name}\n"
+                f"Resource Group: {plan.resource_group}\n"
+                f"Location: {plan.location}\n"
+                f"SKU: {sku}\n"
+                f"Status: {plan.status or 'N/A'}\n"
+                f"Kind: {plan.kind or 'N/A'}\n"
+                f"Workers: {plan.number_of_workers or 0}"
+            )
+
+        if not formatted:
+            scope = f"resource group '{resource_group}'" if resource_group else "subscription"
+            return f"No App Service plans found in {scope}."
+
+        return f"App Service Plans ({len(formatted)} found):\n\n" + "\n---\n".join(formatted)
+
+    except ImportError as e:
+        return str(e)
+    except Exception as e:
+        error_msg = format_error_message(e, "Failed to list App Service plans")
+        logger.error(error_msg)
+        return error_msg
+
+
+async def appservice_plan_show(name: str, resource_group: str) -> str:
+    """Show details of an App Service plan (similar to 'az appservice plan show').
+
+    Args:
+        name: App Service plan name
+        resource_group: Resource group containing the plan
+
+    Returns:
+        Plan details
+    """
+    try:
+        client = _get_web_client()
+        plan = client.app_service_plans.get(resource_group, name)
+
+        sku = f"{plan.sku.name} ({plan.sku.tier})" if plan.sku else "N/A"
+        sku_capacity = str(plan.sku.capacity) if plan.sku else "N/A"
+
+        output = (
+            f"App Service Plan:\n"
+            f"{'='*50}\n"
+            f"Name: {plan.name}\n"
+            f"Resource Group: {resource_group}\n"
+            f"Location: {plan.location}\n"
+            f"SKU: {sku}\n"
+            f"SKU Capacity: {sku_capacity}\n"
+            f"Status: {plan.status or 'N/A'}\n"
+            f"Kind: {plan.kind or 'N/A'}\n"
+            f"Reserved (Linux): {plan.reserved or False}\n"
+            f"Workers: {plan.number_of_workers or 0}\n"
+            f"Max Workers: {plan.maximum_number_of_workers or 'N/A'}\n"
+            f"Number of Sites: {plan.number_of_sites or 0}\n"
+            f"Provisioning State: {plan.provisioning_state or 'N/A'}\n"
+            f"ID: {plan.id}"
+        )
+        return output
+
+    except ImportError as e:
+        return str(e)
+    except Exception as e:
+        error_msg = format_error_message(e, f"Failed to show App Service plan '{name}'")
+        logger.error(error_msg)
+        return error_msg
+
+
+async def webapp_list(resource_group: str = "") -> str:
+    """List web apps (similar to 'az webapp list').
+
+    Args:
+        resource_group: Optional resource group to filter by
+
+    Returns:
+        Formatted list of web apps
+    """
+    try:
+        client = _get_web_client()
+
+        if resource_group:
+            apps = client.web_apps.list_by_resource_group(resource_group)
+        else:
+            apps = client.web_apps.list()
+
+        formatted = []
+        for app in apps:
+            formatted.append(
+                f"Name: {app.name}\n"
+                f"Resource Group: {app.resource_group}\n"
+                f"Location: {app.location}\n"
+                f"State: {app.state or 'N/A'}\n"
+                f"Default Hostname: {app.default_host_name or 'N/A'}\n"
+                f"Kind: {app.kind or 'N/A'}\n"
+                f"HTTPS Only: {app.https_only or False}"
+            )
+
+        if not formatted:
+            scope = f"resource group '{resource_group}'" if resource_group else "subscription"
+            return f"No web apps found in {scope}."
+
+        return f"Web Apps ({len(formatted)} found):\n\n" + "\n---\n".join(formatted)
+
+    except ImportError as e:
+        return str(e)
+    except Exception as e:
+        error_msg = format_error_message(e, "Failed to list web apps")
+        logger.error(error_msg)
+        return error_msg
+
+
+async def webapp_show(name: str, resource_group: str) -> str:
+    """Show details of a web app (similar to 'az webapp show').
+
+    Args:
+        name: Web app name
+        resource_group: Resource group containing the web app
+
+    Returns:
+        Web app details
+    """
+    try:
+        client = _get_web_client()
+        app = client.web_apps.get(resource_group, name)
+
+        plan_name = app.server_farm_id.split("/")[-1] if app.server_farm_id else "N/A"
+        outbound_ips = app.outbound_ip_addresses or "N/A"
+        tags = ", ".join(f"{k}={v}" for k, v in (app.tags or {}).items()) or "None"
+
+        output = (
+            f"Web App:\n"
+            f"{'='*50}\n"
+            f"Name: {app.name}\n"
+            f"Resource Group: {resource_group}\n"
+            f"Location: {app.location}\n"
+            f"State: {app.state or 'N/A'}\n"
+            f"Default Hostname: {app.default_host_name or 'N/A'}\n"
+            f"Kind: {app.kind or 'N/A'}\n"
+            f"App Service Plan: {plan_name}\n"
+            f"HTTPS Only: {app.https_only or False}\n"
+            f"Client Cert Enabled: {app.client_cert_enabled or False}\n"
+            f"Availability: {app.availability_state or 'N/A'}\n"
+            f"Outbound IPs: {outbound_ips}\n"
+            f"Last Modified: {app.last_modified_time_utc.isoformat() if app.last_modified_time_utc else 'N/A'}\n"
+            f"Tags: {tags}\n"
+            f"ID: {app.id}"
+        )
+        return output
+
+    except ImportError as e:
+        return str(e)
+    except Exception as e:
+        error_msg = format_error_message(e, f"Failed to show web app '{name}'")
+        logger.error(error_msg)
+        return error_msg
+
+
+async def webapp_start(name: str, resource_group: str) -> str:
+    """Start a web app (similar to 'az webapp start').
+
+    Args:
+        name: Web app name
+        resource_group: Resource group containing the web app
+
+    Returns:
+        Confirmation message
+    """
+    try:
+        client = _get_web_client()
+        client.web_apps.start(resource_group, name)
+        return f"Web app '{name}' started successfully."
+
+    except ImportError as e:
+        return str(e)
+    except Exception as e:
+        error_msg = format_error_message(e, f"Failed to start web app '{name}'")
+        logger.error(error_msg)
+        return error_msg
+
+
+async def webapp_stop(name: str, resource_group: str) -> str:
+    """Stop a web app (similar to 'az webapp stop').
+
+    Args:
+        name: Web app name
+        resource_group: Resource group containing the web app
+
+    Returns:
+        Confirmation message
+    """
+    try:
+        client = _get_web_client()
+        client.web_apps.stop(resource_group, name)
+        return f"Web app '{name}' stopped successfully."
+
+    except ImportError as e:
+        return str(e)
+    except Exception as e:
+        error_msg = format_error_message(e, f"Failed to stop web app '{name}'")
+        logger.error(error_msg)
+        return error_msg
+
+
+async def webapp_restart(name: str, resource_group: str) -> str:
+    """Restart a web app (similar to 'az webapp restart').
+
+    Args:
+        name: Web app name
+        resource_group: Resource group containing the web app
+
+    Returns:
+        Confirmation message
+    """
+    try:
+        client = _get_web_client()
+        client.web_apps.restart(resource_group, name)
+        return f"Web app '{name}' restarted successfully."
+
+    except ImportError as e:
+        return str(e)
+    except Exception as e:
+        error_msg = format_error_message(e, f"Failed to restart web app '{name}'")
+        logger.error(error_msg)
+        return error_msg
+
+
+# =============================================================================
+# Virtual Networks — vnet, subnet, peering
+# =============================================================================
+
+
+def _get_network_client():
+    """Get Azure Network Management client."""
+    global _network_client
+    if _network_client is None:
+        try:
+            from azure.mgmt.network import NetworkManagementClient
+
+            subscription_id = get_subscription_id()
+            if not subscription_id:
+                raise ValueError("Subscription ID not configured")
+
+            _network_client = NetworkManagementClient(
+                credential=_get_azure_credential(),
+                subscription_id=subscription_id,
+            )
+        except ImportError:
+            raise ImportError("Azure Network SDK not installed. Run: pip install azure-mgmt-network")
+    return _network_client
+
+
+async def vnet_list(resource_group: str = "") -> str:
+    """List virtual networks (similar to 'az network vnet list').
+
+    Args:
+        resource_group: Optional resource group to filter by
+
+    Returns:
+        Formatted list of virtual networks
+    """
+    try:
+        client = _get_network_client()
+
+        if resource_group:
+            vnets = client.virtual_networks.list(resource_group)
+        else:
+            vnets = client.virtual_networks.list_all()
+
+        formatted = []
+        for vnet in vnets:
+            rg = vnet.id.split("/")[4] if vnet.id else "N/A"
+            address_space = ", ".join(vnet.address_space.address_prefixes) if vnet.address_space and vnet.address_space.address_prefixes else "N/A"
+            subnet_count = len(vnet.subnets) if vnet.subnets else 0
+            formatted.append(
+                f"Name: {vnet.name}\n"
+                f"Resource Group: {rg}\n"
+                f"Location: {vnet.location}\n"
+                f"Address Space: {address_space}\n"
+                f"Subnets: {subnet_count}\n"
+                f"Provisioning State: {vnet.provisioning_state or 'N/A'}"
+            )
+
+        if not formatted:
+            scope = f"resource group '{resource_group}'" if resource_group else "subscription"
+            return f"No virtual networks found in {scope}."
+
+        return f"Virtual Networks ({len(formatted)} found):\n\n" + "\n---\n".join(formatted)
+
+    except ImportError as e:
+        return str(e)
+    except Exception as e:
+        error_msg = format_error_message(e, "Failed to list virtual networks")
+        logger.error(error_msg)
+        return error_msg
+
+
+async def vnet_show(name: str, resource_group: str) -> str:
+    """Show details of a virtual network (similar to 'az network vnet show').
+
+    Args:
+        name: Virtual network name
+        resource_group: Resource group containing the VNet
+
+    Returns:
+        VNet details
+    """
+    try:
+        client = _get_network_client()
+        vnet = client.virtual_networks.get(resource_group, name)
+
+        address_space = ", ".join(vnet.address_space.address_prefixes) if vnet.address_space and vnet.address_space.address_prefixes else "N/A"
+        dns_servers = ", ".join(vnet.dhcp_options.dns_servers) if vnet.dhcp_options and vnet.dhcp_options.dns_servers else "Azure default"
+        tags = ", ".join(f"{k}={v}" for k, v in (vnet.tags or {}).items()) or "None"
+
+        output = (
+            f"Virtual Network:\n"
+            f"{'='*50}\n"
+            f"Name: {vnet.name}\n"
+            f"Resource Group: {resource_group}\n"
+            f"Location: {vnet.location}\n"
+            f"Address Space: {address_space}\n"
+            f"DNS Servers: {dns_servers}\n"
+            f"Provisioning State: {vnet.provisioning_state or 'N/A'}\n"
+            f"Enable DDoS Protection: {vnet.enable_ddos_protection or False}\n"
+            f"Tags: {tags}\n"
+            f"ID: {vnet.id}\n"
+        )
+
+        # List subnets
+        if vnet.subnets:
+            output += f"\nSubnets ({len(vnet.subnets)}):\n"
+            for subnet in vnet.subnets:
+                prefix = subnet.address_prefix or (", ".join(subnet.address_prefixes) if subnet.address_prefixes else "N/A")
+                nsg_name = subnet.network_security_group.id.split("/")[-1] if subnet.network_security_group else "None"
+                output += f"  - {subnet.name}: {prefix} (NSG: {nsg_name})\n"
+
+        # List peerings
+        if vnet.virtual_network_peerings:
+            output += f"\nPeerings ({len(vnet.virtual_network_peerings)}):\n"
+            for peering in vnet.virtual_network_peerings:
+                remote = peering.remote_virtual_network.id.split("/")[-1] if peering.remote_virtual_network else "N/A"
+                output += f"  - {peering.name}: -> {remote} (State: {peering.peering_state or 'N/A'})\n"
+
+        return output
+
+    except ImportError as e:
+        return str(e)
+    except Exception as e:
+        error_msg = format_error_message(e, f"Failed to show virtual network '{name}'")
+        logger.error(error_msg)
+        return error_msg
+
+
+async def vnet_create(name: str, resource_group: str, address_prefix: str = "10.0.0.0/16", location: str = "") -> str:
+    """Create a virtual network (similar to 'az network vnet create').
+
+    Args:
+        name: Virtual network name
+        resource_group: Resource group to create the VNet in
+        address_prefix: Address space CIDR (default 10.0.0.0/16)
+        location: Azure region (defaults to resource group location)
+
+    Returns:
+        Created VNet details
+    """
+    try:
+        client = _get_network_client()
+
+        # Resolve location from resource group if not specified
+        if not location:
+            resource_client = _get_resource_client()
+            rg = resource_client.resource_groups.get(resource_group)
+            location = rg.location
+
+        vnet_params = {
+            "location": location,
+            "address_space": {"address_prefixes": [address_prefix]},
+            "subnets": [
+                {"name": "default", "address_prefix": address_prefix.rsplit(".", 1)[0] + ".0/24"}
+            ],
+        }
+
+        poller = client.virtual_networks.begin_create_or_update(resource_group, name, vnet_params)
+        result = poller.result()
+
+        address_space = ", ".join(result.address_space.address_prefixes) if result.address_space else "N/A"
+        return (
+            f"Virtual network created successfully!\n"
+            f"{'='*50}\n"
+            f"Name: {result.name}\n"
+            f"Resource Group: {resource_group}\n"
+            f"Location: {result.location}\n"
+            f"Address Space: {address_space}\n"
+            f"Default Subnet: {result.subnets[0].name} ({result.subnets[0].address_prefix})\n"
+            f"ID: {result.id}"
+        )
+
+    except ImportError as e:
+        return str(e)
+    except Exception as e:
+        error_msg = format_error_message(e, f"Failed to create virtual network '{name}'")
+        logger.error(error_msg)
+        return error_msg
+
+
+async def vnet_delete(name: str, resource_group: str) -> str:
+    """Delete a virtual network (similar to 'az network vnet delete').
+
+    Args:
+        name: Virtual network name
+        resource_group: Resource group containing the VNet
+
+    Returns:
+        Confirmation message
+    """
+    try:
+        client = _get_network_client()
+        poller = client.virtual_networks.begin_delete(resource_group, name)
+        poller.result()
+        return f"Virtual network '{name}' deleted from '{resource_group}'."
+
+    except ImportError as e:
+        return str(e)
+    except Exception as e:
+        error_msg = format_error_message(e, f"Failed to delete virtual network '{name}'")
+        logger.error(error_msg)
+        return error_msg
+
+
+async def vnet_subnet_list(vnet_name: str, resource_group: str) -> str:
+    """List subnets in a virtual network (similar to 'az network vnet subnet list').
+
+    Args:
+        vnet_name: Virtual network name
+        resource_group: Resource group containing the VNet
+
+    Returns:
+        Formatted list of subnets
+    """
+    try:
+        client = _get_network_client()
+        subnets = client.subnets.list(resource_group, vnet_name)
+
+        formatted = []
+        for subnet in subnets:
+            prefix = subnet.address_prefix or (", ".join(subnet.address_prefixes) if subnet.address_prefixes else "N/A")
+            nsg_name = subnet.network_security_group.id.split("/")[-1] if subnet.network_security_group else "None"
+            delegations = ", ".join(d.service_name for d in (subnet.delegations or [])) or "None"
+            formatted.append(
+                f"Name: {subnet.name}\n"
+                f"Address Prefix: {prefix}\n"
+                f"NSG: {nsg_name}\n"
+                f"Delegations: {delegations}\n"
+                f"Provisioning State: {subnet.provisioning_state or 'N/A'}"
+            )
+
+        if not formatted:
+            return f"No subnets found in virtual network '{vnet_name}'."
+
+        return f"Subnets in '{vnet_name}' ({len(formatted)} found):\n\n" + "\n---\n".join(formatted)
+
+    except ImportError as e:
+        return str(e)
+    except Exception as e:
+        error_msg = format_error_message(e, f"Failed to list subnets in '{vnet_name}'")
+        logger.error(error_msg)
+        return error_msg
+
+
+async def vnet_subnet_show(vnet_name: str, subnet_name: str, resource_group: str) -> str:
+    """Show details of a subnet (similar to 'az network vnet subnet show').
+
+    Args:
+        vnet_name: Virtual network name
+        subnet_name: Subnet name
+        resource_group: Resource group containing the VNet
+
+    Returns:
+        Subnet details
+    """
+    try:
+        client = _get_network_client()
+        subnet = client.subnets.get(resource_group, vnet_name, subnet_name)
+
+        prefix = subnet.address_prefix or (", ".join(subnet.address_prefixes) if subnet.address_prefixes else "N/A")
+        nsg_name = subnet.network_security_group.id.split("/")[-1] if subnet.network_security_group else "None"
+        route_table = subnet.route_table.id.split("/")[-1] if subnet.route_table else "None"
+        delegations = ", ".join(d.service_name for d in (subnet.delegations or [])) or "None"
+        service_endpoints = ", ".join(ep.service for ep in (subnet.service_endpoints or [])) or "None"
+        ip_configs = len(subnet.ip_configurations) if subnet.ip_configurations else 0
+        private_endpoint_policy = subnet.private_endpoint_network_policies or "N/A"
+
+        return (
+            f"Subnet:\n"
+            f"{'='*50}\n"
+            f"Name: {subnet.name}\n"
+            f"VNet: {vnet_name}\n"
+            f"Resource Group: {resource_group}\n"
+            f"Address Prefix: {prefix}\n"
+            f"NSG: {nsg_name}\n"
+            f"Route Table: {route_table}\n"
+            f"Delegations: {delegations}\n"
+            f"Service Endpoints: {service_endpoints}\n"
+            f"Private Endpoint Policy: {private_endpoint_policy}\n"
+            f"Connected Devices: {ip_configs}\n"
+            f"Provisioning State: {subnet.provisioning_state or 'N/A'}\n"
+            f"ID: {subnet.id}"
+        )
+
+    except ImportError as e:
+        return str(e)
+    except Exception as e:
+        error_msg = format_error_message(e, f"Failed to show subnet '{subnet_name}'")
+        logger.error(error_msg)
+        return error_msg
+
+
+async def vnet_subnet_create(vnet_name: str, subnet_name: str, resource_group: str, address_prefix: str) -> str:
+    """Create a subnet in a virtual network (similar to 'az network vnet subnet create').
+
+    Args:
+        vnet_name: Virtual network name
+        subnet_name: Name for the new subnet
+        resource_group: Resource group containing the VNet
+        address_prefix: Subnet address prefix in CIDR notation (e.g. 10.0.1.0/24)
+
+    Returns:
+        Created subnet details
+    """
+    try:
+        client = _get_network_client()
+
+        subnet_params = {"address_prefix": address_prefix}
+        poller = client.subnets.begin_create_or_update(resource_group, vnet_name, subnet_name, subnet_params)
+        result = poller.result()
+
+        return (
+            f"Subnet created successfully!\n"
+            f"{'='*50}\n"
+            f"Name: {result.name}\n"
+            f"VNet: {vnet_name}\n"
+            f"Address Prefix: {result.address_prefix}\n"
+            f"Provisioning State: {result.provisioning_state or 'N/A'}\n"
+            f"ID: {result.id}"
+        )
+
+    except ImportError as e:
+        return str(e)
+    except Exception as e:
+        error_msg = format_error_message(e, f"Failed to create subnet '{subnet_name}'")
+        logger.error(error_msg)
+        return error_msg
+
+
+async def vnet_subnet_delete(vnet_name: str, subnet_name: str, resource_group: str) -> str:
+    """Delete a subnet from a virtual network (similar to 'az network vnet subnet delete').
+
+    Args:
+        vnet_name: Virtual network name
+        subnet_name: Subnet name to delete
+        resource_group: Resource group containing the VNet
+
+    Returns:
+        Confirmation message
+    """
+    try:
+        client = _get_network_client()
+        poller = client.subnets.begin_delete(resource_group, vnet_name, subnet_name)
+        poller.result()
+        return f"Subnet '{subnet_name}' deleted from VNet '{vnet_name}'."
+
+    except ImportError as e:
+        return str(e)
+    except Exception as e:
+        error_msg = format_error_message(e, f"Failed to delete subnet '{subnet_name}'")
+        logger.error(error_msg)
+        return error_msg
+
+
+async def vnet_peering_list(vnet_name: str, resource_group: str) -> str:
+    """List peerings for a virtual network (similar to 'az network vnet peering list').
+
+    Args:
+        vnet_name: Virtual network name
+        resource_group: Resource group containing the VNet
+
+    Returns:
+        Formatted list of peerings
+    """
+    try:
+        client = _get_network_client()
+        peerings = client.virtual_network_peerings.list(resource_group, vnet_name)
+
+        formatted = []
+        for p in peerings:
+            remote = p.remote_virtual_network.id.split("/")[-1] if p.remote_virtual_network else "N/A"
+            remote_rg = p.remote_virtual_network.id.split("/")[4] if p.remote_virtual_network and p.remote_virtual_network.id else "N/A"
+            formatted.append(
+                f"Name: {p.name}\n"
+                f"Peering State: {p.peering_state or 'N/A'}\n"
+                f"Remote VNet: {remote} (RG: {remote_rg})\n"
+                f"Allow VNet Access: {p.allow_virtual_network_access}\n"
+                f"Allow Forwarded Traffic: {p.allow_forwarded_traffic}\n"
+                f"Allow Gateway Transit: {p.allow_gateway_transit}\n"
+                f"Use Remote Gateways: {p.use_remote_gateways}\n"
+                f"Provisioning State: {p.provisioning_state or 'N/A'}"
+            )
+
+        if not formatted:
+            return f"No peerings found for virtual network '{vnet_name}'."
+
+        return f"VNet Peerings for '{vnet_name}' ({len(formatted)} found):\n\n" + "\n---\n".join(formatted)
+
+    except ImportError as e:
+        return str(e)
+    except Exception as e:
+        error_msg = format_error_message(e, f"Failed to list peerings for '{vnet_name}'")
         logger.error(error_msg)
         return error_msg
 

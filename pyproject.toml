@@ -18,6 +18,13 @@ dependencies = [
     "six>=1.16.0",  # Required by azure-mgmt-managementgroups
     "azure-mgmt-authorization>=4.0.0",
     "azure-mgmt-monitor>=6.0.0",
+    # App Configuration
+    "azure-mgmt-appconfiguration>=3.0.0",
+    "azure-appconfiguration>=1.6.0",
+    # App Service
+    "azure-mgmt-web>=7.0.0",
+    # Networking (VNets, subnets, peerings, NSGs)
+    "azure-mgmt-network>=25.0.0",
 ]
 
 [project.optional-dependencies]

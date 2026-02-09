@@ -13,6 +13,10 @@ azure-mgmt-subscription>=3.1.0
 azure-mgmt-managementgroups>=1.0.0
 azure-mgmt-authorization>=4.0.0
 azure-mgmt-monitor>=6.0.0
+azure-mgmt-appconfiguration>=3.0.0
+azure-appconfiguration>=1.6.0
+azure-mgmt-web>=7.0.0
+azure-mgmt-network>=25.0.0
 
 # Optional dependencies for monitoring
 psutil>=5.9.0  # System metrics

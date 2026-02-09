@@ -16,18 +16,21 @@ class TestHealthCheck:
         result = await server.health_check()
 
         assert result["status"] == "healthy"
-        assert "modules" in result
+        assert "dependencies" in result
         assert "timestamp" in result
         assert "version" in result
 
     @pytest.mark.asyncio
-    async def test_health_check_includes_modules(self):
-        """Test that health_check includes module status."""
+    async def test_health_check_includes_dependencies(self):
+        """Test that health_check includes Azure SDK dependency status."""
         result = await server.health_check()
 
-        assert "cloud" in result["modules"]
-        assert "containers" in result["modules"]
-        assert "monitoring" in result["modules"]
+        deps = result["dependencies"]
+        assert "azure-identity" in deps
+        assert "azure-mgmt-compute" in deps
+        assert "azure-mgmt-resource" in deps
+        assert "azure-mgmt-appconfiguration" in deps
+        assert "azure-mgmt-web" in deps
 
 
 class TestAuthStatus:

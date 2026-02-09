@@ -1,8 +1,27 @@
 [project]
 name = "azops-mcp"
 version = "0.1.0"
-description = "Azure Infrastructure MCP Server"
+description = "Azure Infrastructure MCP Server – manage Azure resources from any MCP-compatible AI assistant"
+readme = "README.md"
+license = {text = "MIT"}
 requires-python = ">=3.10"
+authors = [
+    {name = "Artem Kozlenkov", email = "artem@kozlenkov.dev"},
+]
+keywords = ["azure", "mcp", "infrastructure", "devops", "cloud", "model-context-protocol"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: System :: Systems Administration",
+    "Topic :: Software Development :: Libraries",
+]
 dependencies = [
     "mcp[cli]>=1.2.0",
     "httpx>=0.27.0",
@@ -42,6 +61,14 @@ dev = [
 monitoring = [
     "psutil>=5.9.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/artemkozlenkov/azops-mcp"
+Repository = "https://github.com/artemkozlenkov/azops-mcp"
+Issues = "https://github.com/artemkozlenkov/azops-mcp/issues"
+
+[project.scripts]
+azops-mcp = "azops_mcp.server:main"
 
 [build-system]
 requires = ["hatchling"]

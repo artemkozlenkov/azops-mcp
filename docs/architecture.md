@@ -21,28 +21,31 @@ How azops-mcp works under the hood.
 ## High-Level Overview
 
 ```
-┌──────────────────┐  stdio (JSON-RPC)  ┌───────────────────────────┐
-│   AI Assistant    │ ◄────────────────► │       azops-mcp           │
-│   (Cursor, etc.)  │                   │                           │
-└──────────────────┘                    │  server.py                │
-                                        │    └─ 26 tools            │
-                                        │                           │
-                                        │  tools/                   │
-                                        │    └─ cloud.py  (Azure)   │
-                                        │                           │
-                                        │  utils/                   │
-                                        │    └─ helpers.py          │
-                                        │                           │
-                                        │  config.py               │
-                                        └────────────┬──────────────┘
-                                                     │
-                                           Azure SDK REST calls
-                                                     │
-                                                     ▼
-                                           ┌─────────────────┐
-                                           │   Azure Cloud   │
-                                           │   (ARM API)     │
-                                           └─────────────────┘
+┌──────────────────┐  stdio (JSON-RPC)  ┌───────────────────────────────────┐
+│   AI Assistant    │ ◄────────────────► │           azops-mcp              │
+│   (Cursor, etc.)  │                   │                                   │
+└──────────────────┘                    │  server.py  (93 tools)            │
+                                        │                                   │
+                                        │  tools/                           │
+                                        │    ├─ _clients.py      (shared)   │
+                                        │    ├─ subscription.py  (auth)     │
+                                        │    ├─ compute.py       (VMs)      │
+                                        │    ├─ networking.py    (VNets)    │
+                                        │    ├─ container_registry.py (ACR) │
+                                        │    ├─ active_directory.py  (AAD)  │
+                                        │    ├─ ...              (13 more)  │
+                                        │                                   │
+                                        │  config.py                        │
+                                        │  utils/helpers.py                 │
+                                        └──────────────┬────────────────────┘
+                                                       │
+                                             Azure SDK REST calls
+                                                       │
+                                                       ▼
+                                             ┌─────────────────┐
+                                             │   Azure Cloud   │
+                                             │   (ARM API)     │
+                                             └─────────────────┘
 ```
 
 `azops-mcp` is a single Python process started by the AI client as a subprocess. It communicates over **stdio** using the [Model Context Protocol](https://modelcontextprotocol.io/) and calls Azure SDK operations using your local credentials or a configured Service Principal.
@@ -51,19 +54,19 @@ How azops-mcp works under the hood.
 
 ## Tool Registration
 
-All 26 tools are registered at module level using the `@mcp.tool()` decorator. Each tool is a thin async wrapper that validates inputs, delegates to `tools/cloud.py`, and catches exceptions:
+All 93 tools are registered at module level using the `@mcp.tool()` decorator. Each tool is a thin async wrapper that validates inputs, delegates to the appropriate tool module, and catches exceptions:
 
 ```python
 @mcp.tool()
 async def list_resource_groups() -> str:
     """List all resource groups in the subscription."""
     try:
-        return await cloud.list_resource_groups()
+        return await resource_groups.list_resource_groups()
     except Exception as e:
         return f"Error: {e}"
 ```
 
-The MCP `tools/list` response includes all 26 tools with their names, descriptions, and parameter schemas. The AI client uses this to decide which tool to call.
+The MCP `tools/list` response includes all 93 tools with their names, descriptions, and parameter schemas. The AI client uses this to decide which tool to call.
 
 ---
 
@@ -85,17 +88,20 @@ When you run `python -m azops_mcp`, this module imports and calls `main()` from 
 This is the core of the application. It:
 
 1. **Initialises FastMCP** — creates a `FastMCP("azops-mcp")` instance from the `mcp` SDK.
-2. **Registers all 26 tools** — each `@mcp.tool()` decorated async function becomes a callable tool for the AI assistant.
-3. **Handles lifecycle** — `main()` starts the MCP server on stdio transport and installs signal handlers for graceful shutdown.
+2. **Imports tool modules** — imports all 14 tool modules from the `tools/` package.
+3. **Registers all 93 tools** — each `@mcp.tool()` decorated async function becomes a callable tool for the AI assistant.
+4. **Handles lifecycle** — `main()` starts the MCP server on stdio transport and installs signal handlers for graceful shutdown.
 
 Tool pattern:
 
 ```python
+from .tools import subscription, compute, networking, ...
+
 @mcp.tool()
-async def list_resource_groups() -> str:
-    """List all resource groups in the subscription."""
+async def start_vm(resource_group: str, vm_name: str) -> str:
+    """Start a virtual machine."""
     try:
-        return await cloud.list_resource_groups()
+        return await compute.manage_vm(resource_group, vm_name, "start")
     except Exception as e:
         return f"Error: {e}"
 ```
@@ -117,13 +123,32 @@ A `@dataclass` called `ServerConfig` with fields loaded from environment variabl
 
 A global `config` singleton is created at import time. The `validate()` method checks for inconsistencies (e.g., incomplete Service Principal credentials, invalid timeouts).
 
-### `tools/cloud.py` — Azure SDK Integration
+### `tools/` — Azure SDK Integrations (Modular)
 
-This is the largest module (~1300 lines). It contains **all Azure API interactions**.
+The tools package is organized into 14 focused modules grouped by Azure service area:
 
-#### Lazy Client Initialization
+| Module | Responsibility | Key Functions |
+|:-------|:---------------|:-------------|
+| `_clients.py` | Shared auth & lazy SDK client factories | `_get_azure_credential()`, `_get_compute_client()`, `set_subscription_id()` |
+| `subscription.py` | Subscriptions, auth, tenants, locations | `list_subscriptions()`, `configure_subscription()`, `get_auth_status()` |
+| `resource_groups.py` | Resource groups, tags, locks, activity log | `list_resource_groups()`, `list_tags()`, `get_activity_log()` |
+| `compute.py` | VMs, VMSS, resource listing | `list_resources()`, `manage_vm()`, `scale_vmss()` |
+| `networking.py` | VNets, subnets, peerings | `vnet_list()`, `vnet_create()`, `vnet_subnet_create()` |
+| `authorization.py` | RBAC roles & assignments | `list_role_definitions()`, `create_role_assignment()` |
+| `management_groups.py` | Management group hierarchy | `list_management_groups()`, `get_management_group()` |
+| `app_configuration.py` | App Configuration stores & key-values | `appconfig_list()`, `appconfig_kv_set()` |
+| `app_service.py` | App Service plans & web apps | `appservice_plan_list()`, `webapp_list()`, `webapp_start()` |
+| `container_registry.py` | Azure Container Registry (ACR) | `acr_list_registries()`, `acr_create_registry()` |
+| `active_directory.py` | Azure AD / Entra ID | `list_users()`, `create_user()`, `list_applications()` |
+| `webapp_deployment.py` | Web App for Containers deployment | `webapp_create_for_container()`, `webapp_grant_cr_access()` |
+| `docker.py` | Local Docker container runtime | `list_containers()`, `get_container_logs()` |
+| `monitoring.py` | System metrics & health | `get_system_metrics()`, `check_service_health()` |
 
-Azure SDK clients are expensive to construct. `cloud.py` uses a lazy-loading pattern with module-level globals:
+#### `_clients.py` — Shared Authentication & Client Factories
+
+This is the foundation module. It provides:
+
+**Lazy Client Initialization** — Azure SDK clients are expensive to construct. `_clients.py` uses module-level globals with lazy loading:
 
 ```python
 _azure_credential = None
@@ -141,7 +166,7 @@ def _get_compute_client():
 
 Each client is created once on first use, then cached for the session.
 
-#### Authentication Chain
+**Authentication Chain:**
 
 ```python
 def _get_azure_credential():
@@ -152,34 +177,35 @@ def _get_azure_credential():
 
 If `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, and `AZURE_TENANT_ID` are all set, a `ClientSecretCredential` is used. Otherwise, a `ChainedTokenCredential` tries Azure CLI first, then Managed Identity.
 
-#### Runtime Subscription Override
-
-Users can switch subscriptions at runtime without restarting the server:
+**Runtime Subscription Override:**
 
 ```python
 _runtime_config = {"subscription_id": None}
 
 def set_subscription_id(subscription_id: str):
     _runtime_config["subscription_id"] = subscription_id
-    # Clear cached clients so they pick up the new subscription
-    _compute_client = None
-    _resource_client = None
-    ...
+    # Clear ALL cached clients so they pick up the new subscription
 ```
 
 `get_subscription_id()` returns the runtime override if set, falling back to the `.env` value.
 
 #### Azure Client Matrix
 
-| Client | SDK Package | Used For |
-|:-------|:-----------|:---------|
-| `ComputeManagementClient` | `azure-mgmt-compute` | VMs, VMSS |
-| `ResourceManagementClient` | `azure-mgmt-resource` | Resource groups, locks, tags |
-| `StorageManagementClient` | `azure-mgmt-storage` | Storage accounts |
-| `SubscriptionClient` | `azure-mgmt-subscription` | Subscriptions, tenants, locations |
-| `ManagementGroupsAPI` | `azure-mgmt-managementgroups` | Management group hierarchy |
-| `AuthorizationManagementClient` | `azure-mgmt-authorization` | RBAC role definitions |
-| `MonitorManagementClient` | `azure-mgmt-monitor` | Activity / audit logs |
+| Client | SDK Package | Used By |
+|:-------|:-----------|:--------|
+| `ComputeManagementClient` | `azure-mgmt-compute` | `compute.py` |
+| `ResourceManagementClient` | `azure-mgmt-resource` | `resource_groups.py`, `compute.py` |
+| `StorageManagementClient` | `azure-mgmt-storage` | `compute.py` |
+| `SubscriptionClient` | `azure-mgmt-subscription` | `subscription.py` |
+| `ManagementGroupsAPI` | `azure-mgmt-managementgroups` | `management_groups.py` |
+| `AuthorizationManagementClient` | `azure-mgmt-authorization` | `authorization.py` |
+| `MonitorManagementClient` | `azure-mgmt-monitor` | `resource_groups.py` |
+| `WebSiteManagementClient` | `azure-mgmt-web` | `app_service.py`, `webapp_deployment.py` |
+| `NetworkManagementClient` | `azure-mgmt-network` | `networking.py`, `webapp_deployment.py` |
+| `ContainerRegistryManagementClient` | `azure-mgmt-containerregistry` | `container_registry.py` |
+| `AppConfigurationManagementClient` | `azure-mgmt-appconfiguration` | `app_configuration.py` |
+| `AzureAppConfigurationClient` | `azure-appconfiguration` | `app_configuration.py` |
+| `GraphServiceClient` | `msgraph-sdk` | `active_directory.py` |
 
 ### `utils/helpers.py` — Shared Utilities
 
@@ -195,10 +221,10 @@ def set_subscription_id(subscription_id: str):
 
 1. **AI client** sends a JSON-RPC `tools/call` message over stdio.
 2. **FastMCP** deserializes the request and dispatches to the matching `@mcp.tool()` function in `server.py`.
-3. **server.py** wrapper validates inputs and delegates to `tools/cloud.py`.
-4. `cloud.py` lazily initializes the Azure SDK client (using credentials from `config.py`).
+3. **server.py** wrapper validates inputs and delegates to the appropriate tool module (e.g., `compute.py`, `networking.py`).
+4. The tool module lazily initializes the Azure SDK client via `_clients.py` (using credentials from `config.py`).
 5. **Azure SDK** makes a REST call to the Azure Resource Manager API.
-6. Response flows back: SDK -> `cloud.py` (formats as string) -> `server.py` -> FastMCP -> stdio -> AI client.
+6. Response flows back: SDK -> tool module (formats as string) -> `server.py` -> FastMCP -> stdio -> AI client.
 
 ---
 
@@ -232,3 +258,30 @@ Every tool follows defensive error handling:
 - **Catch-all** — top-level `except Exception` in every tool ensures the server never crashes
 
 Errors are returned as plain-text strings (not exceptions) so the AI can relay them to the user.
+
+---
+
+## Testing
+
+Tests are organized into separate files by integration category, mirroring the tool module structure:
+
+| Test File | Covers |
+|:----------|:-------|
+| `test_subscription.py` | Subscription, auth, account tools |
+| `test_resource_groups.py` | Resource groups, tags, locks, activity log |
+| `test_compute.py` | VMs, VMSS, storage, resources |
+| `test_networking.py` | VNets, subnets, peerings |
+| `test_authorization.py` | RBAC roles & assignments |
+| `test_container_registry.py` | ACR tools |
+| `test_active_directory.py` | Azure AD tools |
+| `test_webapp_deployment.py` | Web App for Containers |
+| `test_docker.py` | Docker container runtime |
+| `test_monitoring.py` | System metrics & health |
+| `test_health.py` | Health check & rate limiting |
+| `test_config.py` | Configuration management |
+
+All tests use `pytest` with `unittest.mock` to mock Azure SDK calls. Run with:
+
+```bash
+pytest tests/ -v
+```

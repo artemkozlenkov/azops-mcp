@@ -7,7 +7,7 @@ nav_order: 4
 # Tools Reference
 {: .no_toc }
 
-Complete reference for all 26 tools exposed by azops-mcp.
+Complete reference for all 93 tools exposed by azops-mcp, organized by Azure service category.
 {: .fs-6 .fw-300 }
 
 ## Table of contents
@@ -18,7 +18,7 @@ Complete reference for all 26 tools exposed by azops-mcp.
 
 ---
 
-## 1. Health & Status
+## 1. Health & Status (1 tool)
 
 ### `health_check`
 
@@ -141,7 +141,7 @@ Get details of a management group including its children.
 
 ---
 
-## 4. RBAC — Role Definitions (1 tool)
+## 4. RBAC (4 tools)
 
 ### `list_role_definitions`
 
@@ -152,9 +152,36 @@ List available Azure role definitions (built-in roles).
 | **Parameters** | None |
 | **Returns** | Role names, IDs, and truncated descriptions (max 15) |
 
+### `create_role_assignment`
+
+Create a new role assignment (RBAC).
+
+| | |
+|:--|:--|
+| **Parameters** | `principal_id` (str, required), `role_definition_name` (str, required), `resource_group` (str, optional), `scope` (str, optional) |
+| **Returns** | Assignment details including role, principal, and scope |
+
+### `delete_role_assignment`
+
+Delete a role assignment.
+
+| | |
+|:--|:--|
+| **Parameters** | `assignment_id` (str, required) |
+| **Returns** | Deletion confirmation |
+
+### `list_role_assignments_for_principal`
+
+List role assignments for a specific principal.
+
+| | |
+|:--|:--|
+| **Parameters** | `principal_id` (str, required), `resource_group` (str, optional) |
+| **Returns** | Role assignments for the principal |
+
 ---
 
-## 5. Resource Locks (1 tool)
+## 5. Governance (3 tools)
 
 ### `list_resource_locks`
 
@@ -165,10 +192,6 @@ List resource locks in subscription or resource group.
 | **Parameters** | `resource_group` (str, optional) |
 | **Returns** | Lock names, levels, and notes |
 
----
-
-## 6. Tags (1 tool)
-
 ### `list_tags`
 
 List tags in subscription or on a resource group.
@@ -177,10 +200,6 @@ List tags in subscription or on a resource group.
 |:--|:--|
 | **Parameters** | `resource_group` (str, optional) |
 | **Returns** | Tag key/value pairs or subscription tag names with sample values |
-
----
-
-## 7. Activity Log (1 tool)
 
 ### `get_activity_log`
 
@@ -195,7 +214,7 @@ Uses the Azure Monitor SDK to query the activity log.
 
 ---
 
-## 8. Resource Groups (2 tools)
+## 6. Resource Groups (2 tools)
 
 ### `list_resource_groups`
 
@@ -219,7 +238,7 @@ List resources in a resource group.
 
 ---
 
-## 9. Virtual Machines (7 tools)
+## 7. Virtual Machines (7 tools)
 
 ### `list_vms`
 
@@ -286,7 +305,7 @@ Scale a Virtual Machine Scale Set.
 
 ---
 
-## 10. Storage Accounts (2 tools)
+## 8. Storage Accounts (2 tools)
 
 ### `list_storage_accounts`
 
@@ -305,3 +324,619 @@ Get status of a storage account.
 |:--|:--|
 | **Parameters** | `resource_group` (str, required), `account_name` (str, required) |
 | **Returns** | Name, location, kind, SKU, provisioning state, primary endpoints |
+
+---
+
+## 9. App Configuration (6 tools)
+
+### `appconfig_list`
+
+List App Configuration stores in the subscription or resource group.
+
+| | |
+|:--|:--|
+| **Parameters** | `resource_group` (str, optional) |
+| **Returns** | Store names, locations, endpoints, SKUs, and provisioning states |
+
+### `appconfig_show`
+
+Show details of an App Configuration store.
+
+| | |
+|:--|:--|
+| **Parameters** | `store_name` (str, required), `resource_group` (str, required) |
+| **Returns** | Full store details including endpoint, SKU, creation date, and tags |
+
+### `appconfig_kv_list`
+
+List key-values in an App Configuration store.
+
+| | |
+|:--|:--|
+| **Parameters** | `store_name` (str, required), `resource_group` (str, optional), `key_filter` (str, default `"*"`), `label_filter` (str, optional) |
+| **Returns** | Keys, values (truncated), labels, content types (max 50 entries) |
+
+### `appconfig_kv_show`
+
+Show a specific key-value from an App Configuration store.
+
+| | |
+|:--|:--|
+| **Parameters** | `store_name` (str, required), `key` (str, required), `resource_group` (str, optional), `label` (str, optional) |
+| **Returns** | Key, value, label, content type, last modified, read-only status, etag |
+
+### `appconfig_kv_set`
+
+Set a key-value in an App Configuration store.
+
+| | |
+|:--|:--|
+| **Parameters** | `store_name` (str, required), `key` (str, required), `value` (str, required), `resource_group` (str, optional), `label` (str, optional), `content_type` (str, optional) |
+| **Returns** | Confirmation with key, value, and label |
+
+### `appconfig_kv_delete`
+
+Delete a key-value from an App Configuration store.
+
+| | |
+|:--|:--|
+| **Parameters** | `store_name` (str, required), `key` (str, required), `resource_group` (str, optional), `label` (str, optional) |
+| **Returns** | Deletion confirmation |
+
+---
+
+## 10. App Service (7 tools)
+
+### `appservice_plan_list`
+
+List App Service plans in the subscription or resource group.
+
+| | |
+|:--|:--|
+| **Parameters** | `resource_group` (str, optional) |
+| **Returns** | Plan names, locations, SKUs, status, and worker counts |
+
+### `appservice_plan_show`
+
+Show details of an App Service plan.
+
+| | |
+|:--|:--|
+| **Parameters** | `name` (str, required), `resource_group` (str, required) |
+| **Returns** | Full plan details including SKU, capacity, workers, and number of sites |
+
+### `webapp_list`
+
+List web apps in the subscription or resource group.
+
+| | |
+|:--|:--|
+| **Parameters** | `resource_group` (str, optional) |
+| **Returns** | Web app names, locations, states, hostnames, and kinds |
+
+### `webapp_show`
+
+Show details of a web app.
+
+| | |
+|:--|:--|
+| **Parameters** | `name` (str, required), `resource_group` (str, required) |
+| **Returns** | Full web app details including state, hostname, plan, HTTPS settings, and outbound IPs |
+
+### `webapp_start`
+
+Start a web app.
+
+| | |
+|:--|:--|
+| **Parameters** | `name` (str, required), `resource_group` (str, required) |
+| **Returns** | Success confirmation |
+
+### `webapp_stop`
+
+Stop a web app.
+
+| | |
+|:--|:--|
+| **Parameters** | `name` (str, required), `resource_group` (str, required) |
+| **Returns** | Success confirmation |
+
+### `webapp_restart`
+
+Restart a web app.
+
+| | |
+|:--|:--|
+| **Parameters** | `name` (str, required), `resource_group` (str, required) |
+| **Returns** | Success confirmation |
+
+---
+
+## 11. Web Apps for Containers (7 tools)
+
+### `webapp_create_for_container`
+
+Create a Web App for Containers on Azure App Service.
+
+| | |
+|:--|:--|
+| **Parameters** | `name` (str, required), `resource_group` (str, required), `plan_name` (str, required), `plan_sku` (str, default `"P1v2"`), `plan_tier` (str, default `"PremiumV2"`), `location` (str, optional), `image` (str, optional), `registry_url` (str, optional), `registry_username` (str, optional), `registry_password` (str, optional), `os_type` (str, default `"linux"`), `multi_container` (bool, default `false`), `startup_command` (str, optional), `env_variables` (str, optional JSON), `vnet_subnet_id` (str, optional), `assign_identity` (bool, default `false`) |
+| **Returns** | Full deployment details including hostname, App Service plan, container config, and connection strings |
+
+Creates App Service plan (if needed), web app, container config, optional VNet integration, and optional managed identity.
+
+### `webapp_grant_cr_access`
+
+Grant Web App access to Container Registry via RBAC.
+
+| | |
+|:--|:--|
+| **Parameters** | `webapp_name` (str, required), `resource_group` (str, required), `registry_name` (str, required), `registry_resource_group` (str, required), `role` (str, default `"AcrPull"`) |
+| **Returns** | RBAC assignment details |
+
+### `webapp_configure_vnet_integration`
+
+Configure Virtual Network integration for a web app.
+
+| | |
+|:--|:--|
+| **Parameters** | `webapp_name` (str, required), `resource_group` (str, required), `subnet_id` (str, required) |
+| **Returns** | VNet integration details |
+
+### `webapp_assign_identity`
+
+Assign a system-assigned managed identity to a web app.
+
+| | |
+|:--|:--|
+| **Parameters** | `webapp_name` (str, required), `resource_group` (str, required) |
+| **Returns** | Principal ID, tenant ID, identity type |
+
+### `webapp_view_logs`
+
+View web app logs from Azure Monitor.
+
+| | |
+|:--|:--|
+| **Parameters** | `webapp_name` (str, required), `resource_group` (str, required), `days` (int, default `1`, range 1-7) |
+| **Returns** | Activity log entries for the web app |
+
+### `webapp_set_container_registry_credentials`
+
+Set container registry credentials for a web app.
+
+| | |
+|:--|:--|
+| **Parameters** | `webapp_name` (str, required), `resource_group` (str, required), `registry_url` (str, required), `username` (str, required), `password` (str, required), `os_type` (str, default `"linux"`) |
+| **Returns** | Credential configuration confirmation |
+
+### `webapp_delete`
+
+Delete a web app.
+
+| | |
+|:--|:--|
+| **Parameters** | `name` (str, required), `resource_group` (str, required) |
+| **Returns** | Deletion confirmation |
+
+---
+
+## 12. Container Registry (20 tools)
+
+### `acr_list_registries`
+
+List container registries in a resource group or subscription.
+
+| | |
+|:--|:--|
+| **Parameters** | `resource_group` (str, optional) |
+| **Returns** | Registry names, locations, SKUs, admin status, login servers |
+
+### `acr_show_registry`
+
+Get details of a container registry.
+
+| | |
+|:--|:--|
+| **Parameters** | `resource_group` (str, required), `registry_name` (str, required) |
+| **Returns** | Full registry details |
+
+### `acr_create_registry`
+
+Create a new container registry.
+
+| | |
+|:--|:--|
+| **Parameters** | `resource_group` (str, required), `registry_name` (str, required), `location` (str, default `"eastus"`), `sku` (str, default `"Basic"`), `admin_enabled` (bool, default `false`) |
+| **Returns** | Created registry details |
+
+### `acr_delete_registry`
+
+Delete a container registry.
+
+| | |
+|:--|:--|
+| **Parameters** | `resource_group` (str, required), `registry_name` (str, required) |
+| **Returns** | Deletion confirmation |
+
+### `acr_update_registry`
+
+Update a container registry.
+
+| | |
+|:--|:--|
+| **Parameters** | `resource_group` (str, required), `registry_name` (str, required), `admin_enabled` (bool, optional) |
+| **Returns** | Updated registry details |
+
+### `acr_get_credentials`
+
+Get login credentials for a container registry.
+
+| | |
+|:--|:--|
+| **Parameters** | `resource_group` (str, required), `registry_name` (str, required) |
+| **Returns** | Username and passwords |
+
+### `acr_get_login_server`
+
+Get the login server URL for a container registry.
+
+| | |
+|:--|:--|
+| **Parameters** | `resource_group` (str, required), `registry_name` (str, required) |
+| **Returns** | Login server URL |
+
+### `acr_list_repositories`
+
+List repositories in a container registry.
+
+| | |
+|:--|:--|
+| **Parameters** | `resource_group` (str, required), `registry_name` (str, required) |
+| **Returns** | Repository names |
+
+### `acr_list_tags`
+
+List tags in a container registry repository.
+
+| | |
+|:--|:--|
+| **Parameters** | `resource_group` (str, required), `registry_name` (str, required), `repository` (str, required) |
+| **Returns** | Tag names and metadata |
+
+### `acr_show_task`
+
+Get details of a container registry task.
+
+| | |
+|:--|:--|
+| **Parameters** | `resource_group` (str, required), `registry_name` (str, required), `task_name` (str, required) |
+| **Returns** | Task details |
+
+### `acr_list_tasks`
+
+List tasks in a container registry.
+
+| | |
+|:--|:--|
+| **Parameters** | `resource_group` (str, required), `registry_name` (str, required) |
+| **Returns** | Task names and statuses |
+
+### `acr_create_task`
+
+Create a container registry task.
+
+| | |
+|:--|:--|
+| **Parameters** | `resource_group` (str, required), `registry_name` (str, required), `task_name` (str, required), `platform_os` (str, default `"Linux"`), `platform_architecture` (str, default `"amd64"`), `platform_variant` (str, optional) |
+| **Returns** | Created task details |
+
+### `acr_delete_task`
+
+Delete a container registry task.
+
+| | |
+|:--|:--|
+| **Parameters** | `resource_group` (str, required), `registry_name` (str, required), `task_name` (str, required) |
+| **Returns** | Deletion confirmation |
+
+### `acr_run_task`
+
+Run a container registry task.
+
+| | |
+|:--|:--|
+| **Parameters** | `resource_group` (str, required), `registry_name` (str, required), `task_name` (str, required) |
+| **Returns** | Run details |
+
+### `acr_list_builds`
+
+List build tasks in a subscription or specific registry.
+
+| | |
+|:--|:--|
+| **Parameters** | `resource_group` (str, optional), `registry_name` (str, optional) |
+| **Returns** | Build task names and statuses |
+
+### `acr_show_quotas`
+
+Show quota information for a container registry.
+
+| | |
+|:--|:--|
+| **Parameters** | `resource_group` (str, required), `registry_name` (str, required) |
+| **Returns** | Quota limits and usage |
+
+### `acr_show_usage`
+
+Show usage information for a container registry.
+
+| | |
+|:--|:--|
+| **Parameters** | `resource_group` (str, required), `registry_name` (str, required) |
+| **Returns** | Storage usage details |
+
+### `acr_list_network_rules`
+
+List network rules for a container registry.
+
+| | |
+|:--|:--|
+| **Parameters** | `resource_group` (str, required), `registry_name` (str, required) |
+| **Returns** | Default action, IP rules, and VNet rules |
+
+### `acr_update_network_rules`
+
+Update network rules for a container registry.
+
+| | |
+|:--|:--|
+| **Parameters** | `resource_group` (str, required), `registry_name` (str, required), `default_action` (str, default `"Allow"`) |
+| **Returns** | Updated network rule details |
+
+### `acr_reset_client`
+
+Reset cached ACR client and force re-authentication.
+
+| | |
+|:--|:--|
+| **Parameters** | None |
+| **Returns** | Cache cleared confirmation |
+
+---
+
+## 13. Virtual Networks (9 tools)
+
+### `vnet_list`
+
+List virtual networks in the subscription or resource group.
+
+| | |
+|:--|:--|
+| **Parameters** | `resource_group` (str, optional) |
+| **Returns** | VNet names, locations, address spaces, subnet counts |
+
+### `vnet_show`
+
+Show details of a virtual network including subnets and peerings.
+
+| | |
+|:--|:--|
+| **Parameters** | `name` (str, required), `resource_group` (str, required) |
+| **Returns** | Address space, DNS servers, DDoS protection, subnets, peerings, tags |
+
+### `vnet_create`
+
+Create a virtual network with a default subnet.
+
+| | |
+|:--|:--|
+| **Parameters** | `name` (str, required), `resource_group` (str, required), `address_prefix` (str, default `"10.0.0.0/16"`), `location` (str, optional) |
+| **Returns** | Created VNet details |
+
+### `vnet_delete`
+
+Delete a virtual network. Removes all subnets and peerings.
+
+| | |
+|:--|:--|
+| **Parameters** | `name` (str, required), `resource_group` (str, required) |
+| **Returns** | Deletion confirmation |
+
+### `vnet_subnet_list`
+
+List subnets in a virtual network.
+
+| | |
+|:--|:--|
+| **Parameters** | `vnet_name` (str, required), `resource_group` (str, required) |
+| **Returns** | Subnet names, prefixes, NSGs, delegations, provisioning states |
+
+### `vnet_subnet_show`
+
+Show details of a subnet including NSG, route table, and delegations.
+
+| | |
+|:--|:--|
+| **Parameters** | `vnet_name` (str, required), `subnet_name` (str, required), `resource_group` (str, required) |
+| **Returns** | Full subnet details |
+
+### `vnet_subnet_create`
+
+Create a subnet in a virtual network.
+
+| | |
+|:--|:--|
+| **Parameters** | `vnet_name` (str, required), `subnet_name` (str, required), `resource_group` (str, required), `address_prefix` (str, required) |
+| **Returns** | Created subnet details |
+
+### `vnet_subnet_delete`
+
+Delete a subnet from a virtual network.
+
+| | |
+|:--|:--|
+| **Parameters** | `vnet_name` (str, required), `subnet_name` (str, required), `resource_group` (str, required) |
+| **Returns** | Deletion confirmation |
+
+### `vnet_peering_list`
+
+List peerings for a virtual network.
+
+| | |
+|:--|:--|
+| **Parameters** | `vnet_name` (str, required), `resource_group` (str, required) |
+| **Returns** | Peering names, states, remote VNets, access/traffic/gateway settings |
+
+---
+
+## 14. Azure AD / Entra ID (9 tools)
+
+### `aad_list_users`
+
+List Azure AD users.
+
+| | |
+|:--|:--|
+| **Parameters** | `filter` (str, optional — OData filter), `top` (int, default `50`) |
+| **Returns** | Display names, UPNs, object IDs, account status, job titles, departments |
+
+### `aad_show_user`
+
+Get details of an Azure AD user.
+
+| | |
+|:--|:--|
+| **Parameters** | `user_id` (str, required), `user_principal_name` (str, optional) |
+| **Returns** | Full user profile including optional fields (phone, office, address) |
+
+### `aad_create_user`
+
+Create a new Azure AD user.
+
+| | |
+|:--|:--|
+| **Parameters** | `display_name` (str, required), `user_principal_name` (str, required), `password` (str, required), `mail_nick_name` (str, optional), `department` (str, optional), `job_title` (str, optional) |
+| **Returns** | Created user details with temporary password note |
+
+### `aad_delete_user`
+
+Delete an Azure AD user.
+
+| | |
+|:--|:--|
+| **Parameters** | `user_id` (str, required), `user_principal_name` (str, optional) |
+| **Returns** | Deletion confirmation |
+
+### `aad_list_applications`
+
+List Azure AD applications.
+
+| | |
+|:--|:--|
+| **Parameters** | `filter` (str, optional), `top` (int, default `50`) |
+| **Returns** | Application display names, app IDs, object IDs, publisher domains |
+
+### `aad_create_application`
+
+Create a new Azure AD application.
+
+| | |
+|:--|:--|
+| **Parameters** | `display_name` (str, required), `sign_in_audience` (str, default `"AzureADMyOrg"`) |
+| **Returns** | Created application details |
+
+### `aad_list_groups`
+
+List Azure AD groups.
+
+| | |
+|:--|:--|
+| **Parameters** | `filter` (str, optional), `top` (int, default `50`) |
+| **Returns** | Group display names, object IDs, mail, descriptions, group types |
+
+### `aad_verify_tenant`
+
+Verify Azure AD tenant information.
+
+| | |
+|:--|:--|
+| **Parameters** | None |
+| **Returns** | Tenant ID, display name, country, default domain, tenant type, verified domain count |
+
+### `aad_reset_client`
+
+Reset cached Azure AD client and force re-authentication.
+
+| | |
+|:--|:--|
+| **Parameters** | None |
+| **Returns** | Cache cleared confirmation |
+
+---
+
+## 15. Docker Runtime (3 tools)
+
+### `list_containers`
+
+List running Docker containers on the local machine.
+
+| | |
+|:--|:--|
+| **Parameters** | None |
+| **Returns** | Container IDs, names, statuses, and images |
+
+Uses the Docker CLI (`docker ps`) under the hood.
+
+### `get_container_logs`
+
+Retrieve logs from a Docker container.
+
+| | |
+|:--|:--|
+| **Parameters** | `container_id` (str, required), `lines` (int, default `50`) |
+| **Returns** | Container log output |
+
+### `restart_container`
+
+Restart a Docker container.
+
+| | |
+|:--|:--|
+| **Parameters** | `container_id` (str, required) |
+| **Returns** | Restart confirmation |
+
+---
+
+## 16. Monitoring (3 tools)
+
+### `get_system_metrics`
+
+Get system metrics (CPU, memory, disk usage).
+
+| | |
+|:--|:--|
+| **Parameters** | None |
+| **Returns** | CPU usage, memory stats, disk usage |
+
+Uses OS-level commands (`top`, `free`, `df`, `vm_stat`) depending on platform.
+
+### `check_service_health`
+
+Check health of a system service.
+
+| | |
+|:--|:--|
+| **Parameters** | `service_name` (str, required) |
+| **Returns** | Service status (active/inactive) |
+
+Uses `systemctl` on Linux or `launchctl` on macOS.
+
+### `get_infrastructure_status`
+
+Get overall infrastructure health status.
+
+| | |
+|:--|:--|
+| **Parameters** | None |
+| **Returns** | Docker availability, system uptime |

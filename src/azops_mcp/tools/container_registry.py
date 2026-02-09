@@ -21,8 +21,8 @@ def _get_acr_client():
             from azure.identity import ChainedTokenCredential
             from azure.mgmt.containerregistry import ContainerRegistryManagementClient
             
-            # Import cloud module to get credential and subscription
-            from .cloud import _get_azure_credential, get_subscription_id
+            # Import shared clients for credential and subscription
+            from ._clients import _get_azure_credential, get_subscription_id
             
             credential = _get_azure_credential()
             subscription_id = get_subscription_id()

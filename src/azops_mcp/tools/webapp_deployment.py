@@ -4,7 +4,7 @@ import logging
 from typing import Any, Dict, Optional
 
 from ..utils.helpers import format_error_message
-from .cloud import (
+from ._clients import (
     _get_resource_client,
     _get_web_client,
     _get_network_client,
@@ -12,7 +12,7 @@ from .cloud import (
     _get_azure_credential,
     get_subscription_id,
 )
-from .acr import acr_show_registry
+from .container_registry import acr_show_registry
 
 logger = logging.getLogger(__name__)
 

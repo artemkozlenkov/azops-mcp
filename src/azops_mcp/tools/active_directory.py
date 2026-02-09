@@ -14,7 +14,7 @@ _aad_client = None
 def set_aad_subscription(subscription_id: str) -> None:
     """Set the subscription ID and clear AAD client cache."""
     global _aad_client
-    from .cloud import set_subscription_id
+    from ._clients import set_subscription_id
     set_subscription_id(subscription_id)
     _aad_client = None
     logger.info("Azure AD client cache cleared")
@@ -22,13 +22,13 @@ def set_aad_subscription(subscription_id: str) -> None:
 
 def get_aad_subscription() -> Optional[str]:
     """Get the active subscription ID."""
-    from .cloud import get_subscription_id
+    from ._clients import get_subscription_id
     return get_subscription_id()
 
 
 def clear_aad_subscription() -> None:
     """Clear the runtime subscription ID override."""
-    from .cloud import clear_subscription_id
+    from ._clients import clear_subscription_id
     clear_subscription_id()
 
 
@@ -43,7 +43,7 @@ def _get_aad_client():
             from azure.identity import ChainedTokenCredential
             from msgraph import GraphServiceClient
             
-            from .cloud import _get_azure_credential, get_subscription_id
+            from ._clients import _get_azure_credential, get_subscription_id
             
             credential = _get_azure_credential()
             

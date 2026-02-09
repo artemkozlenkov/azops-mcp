@@ -92,7 +92,7 @@ Switch to subscription xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 
 Under the hood, this:
 1. Validates the UUID format
-2. Sets `_runtime_config["subscription_id"]` in `cloud.py`
+2. Sets `_runtime_config["subscription_id"]` in `tools/_clients.py`
 3. Clears all cached Azure SDK clients (so they re-initialize with the new subscription)
 4. Optionally validates the subscription exists by calling the Subscription API
 

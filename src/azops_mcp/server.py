@@ -11,7 +11,7 @@ from typing import Any, Dict, Optional
 from mcp.server.fastmcp import FastMCP
 
 from .config import config
-from .tools import acr, cloud
+from .tools import acr, aad, cloud
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -39,7 +39,7 @@ mcp = FastMCP("azops-mcp")
 # -- 1. Health & Status -------------------------------------------------------
 
 
-@mcp.tool()
+@mdatp.tool()
 async def health_check() -> Dict[str, Any]:
     """Check MCP server health and Azure SDK availability."""
     try:
@@ -56,6 +56,7 @@ async def health_check() -> Dict[str, Any]:
             ("azure-mgmt-web", "azure.mgmt.web"),
             ("azure-mgmt-network", "azure.mgmt.network"),
             ("azure-mgmt-containerregistry", "azure.mgmt.containerregistry"),
+            ("msgraph-sdk", "msgraph"),
         ]:
             try:
                 __import__(path)
@@ -153,6 +154,160 @@ async def account_get_access_token(resource: str = "https://management.azure.com
         return await cloud.get_access_token(resource)
     except Exception as e:
         logger.error("account_get_access_token failed: %s", e)
+        return f"Error: {e}"
+
+
+# -- 15. Azure AD (Entra ID) -------------------------------------------------
+
+@mcp.tool()
+async def aad_list_users(filter: str = "", top: int = 50) -> str:
+    """List Azure AD users.
+    
+    Args:
+        filter: OData filter query (e.g., 'displayName eq 'John Doe'')
+        top: Maximum number of users to return (default 50)
+    """
+    logger.info("aad_list_users: filter=%s, top=%d", filter, top)
+    try:
+        return await aad.list_users(filter, top)
+    except Exception as e:
+        logger.error("aad_list_users failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def aad_show_user(user_id: str, user_principal_name: str = "") -> str:
+    """Get details of an Azure AD user.
+    
+    Args:
+        user_id: Object ID of the user
+        user_principal_name: User principal name (alternative lookup)
+    """
+    logger.info("aad_show_user: id=%s, upn=%s", user_id, user_principal_name)
+    if not user_id and not user_principal_name:
+        return "Error: user_id or user_principal_name is required"
+    try:
+        return await aad.show_user(user_id, user_principal_name)
+    except Exception as e:
+        logger.error("aad_show_user failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def aad_create_user(
+    display_name: str,
+    user_principal_name: str,
+    password: str,
+    mail_nick_name: str = "",
+    department: str = "",
+    job_title: str = "",
+) -> str:
+    """Create a new Azure AD user.
+    
+    Args:
+        display_name: Display name for the user
+        user_principal_name: UserPrincipalName (UPN) for the user
+        password: Initial password for the user
+        mail_nick_name: Mail alias (optional)
+        department: Department name (optional)
+        job_title: Job title (optional)
+    """
+    logger.info("aad_create_user: %s (%s)", display_name, user_principal_name)
+    try:
+        return await aad.create_user(display_name, user_principal_name, password, mail_nick_name, department, job_title)
+    except Exception as e:
+        logger.error("aad_create_user failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def aad_delete_user(user_id: str, user_principal_name: str = "") -> str:
+    """Delete an Azure AD user.
+    
+    Args:
+        user_id: Object ID of the user to delete
+        user_principal_name: User principal name (alternative lookup)
+    """
+    logger.info("aad_delete_user: id=%s, upn=%s", user_id, user_principal_name)
+    if not user_id and not user_principal_name:
+        return "Error: user_id or user_principal_name is required"
+    try:
+        return await aad.delete_user(user_id, user_principal_name)
+    except Exception as e:
+        logger.error("aad_delete_user failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def aad_list_applications(filter: str = "", top: int = 50) -> str:
+    """List Azure AD applications.
+    
+    Args:
+        filter: OData filter query
+        top: Maximum number of applications to return (default 50)
+    """
+    logger.info("aad_list_applications: filter=%s, top=%d", filter, top)
+    try:
+        return await aad.list_applications(filter, top)
+    except Exception as e:
+        logger.error("aad_list_applications failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def aad_create_application(display_name: str, sign_in_audience: str = "AzureADMyOrg") -> str:
+    """Create a new Azure AD application.
+    
+    Args:
+        display_name: Display name for the application
+        sign_in_audience: Who can sign in (default: AzureADMyOrg)
+    """
+    logger.info("aad_create_application: %s, audience=%s", display_name, sign_in_audience)
+    if not display_name:
+        return "Error: display_name is required"
+    try:
+        return await aad.create_application(display_name, sign_in_audience)
+    except Exception as e:
+        logger.error("aad_create_application failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def aad_list_groups(filter: str = "", top: int = 50) -> str:
+    """List Azure AD groups.
+    
+    Args:
+        filter: OData filter query
+        top: Maximum number of groups to return (default 50)
+    """
+    logger.info("aad_list_groups: filter=%s, top=%d", filter, top)
+    try:
+        return await aad.list_groups(filter, top)
+    except Exception as e:
+        logger.error("aad_list_groups failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def aad_verify_tenant() -> str:
+    """Verify Azure AD tenant information."""
+    logger.info("aad_verify_tenant called")
+    try:
+        return await aad.verify_tenant()
+    except Exception as e:
+        logger.error("aad_verify_tenant failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def aad_reset_client() -> str:
+    """Reset cached Azure AD client and force re-authentication."""
+    logger.info("aad_reset_client called")
+    try:
+        aad.reset_aad_client()
+        return "Azure AD client cache cleared"
+    except Exception as e:
+        logger.error("aad_reset_client failed: %s", e)
         return f"Error: {e}"
 
 

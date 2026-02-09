@@ -25,6 +25,8 @@ dependencies = [
     "azure-mgmt-web>=7.0.0",
     # Networking (VNets, subnets, peerings, NSGs)
     "azure-mgmt-network>=25.0.0",
+    # Microsoft Graph (Azure AD/Entra ID)
+    "msgraph-sdk>=1.0.0",
 ]
 
 [project.optional-dependencies]

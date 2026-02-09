@@ -39,7 +39,7 @@ mcp = FastMCP("azops-mcp")
 # -- 1. Health & Status -------------------------------------------------------
 
 
-@mdatp.tool()
+@mcp.tool()
 async def health_check() -> Dict[str, Any]:
     """Check MCP server health and Azure SDK availability."""
     try:
@@ -1430,6 +1430,336 @@ async def vnet_peering_list(vnet_name: str, resource_group: str) -> str:
         return await cloud.vnet_peering_list(vnet_name, resource_group)
     except Exception as e:
         logger.error("vnet_peering_list failed: %s", e)
+        return f"Error: {e}"
+
+
+# -- 16. Web App for Containers ------------------------------
+
+from .tools import webapp
+
+
+@mcp.tool()
+async def webapp_create_for_container(
+    name: str,
+    resource_group: str,
+    plan_name: str,
+    plan_sku: str = "P1v2",
+    plan_tier: str = "PremiumV2",
+    location: str = "",
+    image: str = "",
+    registry_url: str = "",
+    registry_username: str = "",
+    registry_password: str = "",
+    os_type: str = "linux",
+    multi_container: bool = False,
+    startup_command: str = "",
+    env_variables: str = "",
+    vnet_subnet_id: str = "",
+    assign_identity: bool = False,
+) -> str:
+    """Create a Web App for Containers on Azure App Service.
+    
+    Args:
+        name: Web app name (must be unique across Azure)
+        resource_group: Resource group to deploy to
+        plan_name: App Service plan name
+        plan_sku: SKU tier (P1v2, P2v2, P3v2, etc.)
+        plan_tier: SKU tier (PremiumV2, PremiumV3, etc.)
+        location: Azure region (defaults to resource group location)
+        image: Container image (e.g., myregistry.azurecr.io/myapp:latest)
+        registry_url: Container registry URL (e.g., myregistry.azurecr.io)
+        registry_username: Registry username (admin user)
+        registry_password: Registry password/access key
+        os_type: OS type - 'linux' or 'windows'
+        multi_container: Whether to use multi-container (Docker Compose)
+        startup_command: Startup command (e.g., 'python app.py')
+        env_variables: Environment variables as JSON string (optional)
+        vnet_subnet_id: Subnet resource ID for VNet integration
+        assign_identity: Whether to assign system-assigned managed identity
+    """
+    logger.info("webapp_create_for_container: %s/%s", resource_group, name)
+    try:
+        import json
+        env_vars = json.loads(env_variables) if env_variables else None
+        return await webapp.webapp_create_for_container(
+            name, resource_group, plan_name, plan_sku, plan_tier, location,
+            image, registry_url, registry_username, registry_password,
+            os_type, multi_container, startup_command, env_vars,
+            vnet_subnet_id, assign_identity
+        )
+    except Exception as e:
+        logger.error("webapp_create_for_container failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def webapp_grant_cr_access(
+    webapp_name: str,
+    resource_group: str,
+    registry_name: str,
+    registry_resource_group: str,
+    role: str = "AcrPull",
+) -> str:
+    """Grant Web App access to Container Registry via RBAC.
+    
+    Args:
+        webapp_name: Web app name
+        resource_group: Resource group containing the web app
+        registry_name: Container registry name
+        registry_resource_group: Resource group containing the registry
+        role: Role name (AcrPull, AcrPush, etc.)
+    """
+    logger.info("webapp_grant_cr_access: %s -> %s", webapp_name, registry_name)
+    if not webapp_name or not registry_name or not resource_group:
+        return "Error: webapp_name, registry_name, and resource_group are required"
+    try:
+        return await webapp.webapp_grant_cr_access(
+            webapp_name, resource_group, registry_name, registry_resource_group, role
+        )
+    except Exception as e:
+        logger.error("webapp_grant_cr_access failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def webapp_configure_vnet_integration(
+    webapp_name: str,
+    resource_group: str,
+    subnet_id: str,
+) -> str:
+    """Configure Virtual Network integration for a web app.
+    
+    Args:
+        webapp_name: Web app name
+        resource_group: Resource group containing the web app
+        subnet_id: Subnet resource ID to integrate with
+    """
+    logger.info("webapp_configure_vnet_integration: %s", webapp_name)
+    if not webapp_name or not resource_group or not subnet_id:
+        return "Error: webapp_name, resource_group, and subnet_id are required"
+    try:
+        return await webapp.webapp_configure_vnet_integration(webapp_name, resource_group, subnet_id)
+    except Exception as e:
+        logger.error("webapp_configure_vnet_integration failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def webapp_assign_identity(
+    webapp_name: str,
+    resource_group: str,
+) -> str:
+    """Assign a system-assigned managed identity to a web app.
+    
+    Args:
+        webapp_name: Web app name
+        resource_group: Resource group containing the web app
+    """
+    logger.info("webapp_assign_identity: %s", webapp_name)
+    if not webapp_name or not resource_group:
+        return "Error: webapp_name and resource_group are required"
+    try:
+        return await webapp.webapp_assign_identity(webapp_name, resource_group)
+    except Exception as e:
+        logger.error("webapp_assign_identity failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def webapp_view_logs(
+    webapp_name: str,
+    resource_group: str,
+    days: int = 1,
+) -> str:
+    """View web app logs from Azure Monitor.
+    
+    Args:
+        webapp_name: Web app name
+        resource_group: Resource group containing the web app
+        days: Number of days to look back (1-7)
+    """
+    logger.info("webapp_view_logs: %s, days=%d", webapp_name, days)
+    if not webapp_name or not resource_group:
+        return "Error: webapp_name and resource_group are required"
+    try:
+        return await webapp.webapp_view_logs(webapp_name, resource_group, days)
+    except Exception as e:
+        logger.error("webapp_view_logs failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def webapp_set_container_registry_credentials(
+    webapp_name: str,
+    resource_group: str,
+    registry_url: str,
+    username: str,
+    password: str,
+    os_type: str = "linux",
+) -> str:
+    """Set container registry credentials for a web app.
+    
+    Args:
+        webapp_name: Web app name
+        resource_group: Resource group containing the web app
+        registry_url: Container registry URL (e.g., myregistry.azurecr.io)
+        username: Registry username (admin user)
+        password: Registry password/access key
+        os_type: OS type - 'linux' or 'windows'
+    """
+    logger.info("webapp_set_container_registry_credentials: %s", webapp_name)
+    if not webapp_name or not registry_url or not username:
+        return "Error: webapp_name, registry_url, and username are required"
+    try:
+        return await webapp.webapp_set_container_registry_credentials(
+            webapp_name, resource_group, registry_url, username, password, os_type
+        )
+    except Exception as e:
+        logger.error("webapp_set_container_registry_credentials failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def webapp_restart(name: str, resource_group: str) -> str:
+    """Restart a web app.
+    
+    Args:
+        name: Web app name
+        resource_group: Resource group containing the web app
+    """
+    logger.info("webapp_restart: %s/%s", resource_group, name)
+    if not name or not resource_group:
+        return "Error: name and resource_group are required"
+    try:
+        return await webapp.webapp_restart(name, resource_group)
+    except Exception as e:
+        logger.error("webapp_restart failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def webapp_stop(name: str, resource_group: str) -> str:
+    """Stop a web app.
+    
+    Args:
+        name: Web app name
+        resource_group: Resource group containing the web app
+    """
+    logger.info("webapp_stop: %s/%s", resource_group, name)
+    if not name or not resource_group:
+        return "Error: name and resource_group are required"
+    try:
+        return await webapp.webapp_stop(name, resource_group)
+    except Exception as e:
+        logger.error("webapp_stop failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def webapp_start(name: str, resource_group: str) -> str:
+    """Start a web app.
+    
+    Args:
+        name: Web app name
+        resource_group: Resource group containing the web app
+    """
+    logger.info("webapp_start: %s/%s", resource_group, name)
+    if not name or not resource_group:
+        return "Error: name and resource_group are required"
+    try:
+        return await webapp.webapp_start(name, resource_group)
+    except Exception as e:
+        logger.error("webapp_start failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def webapp_delete(name: str, resource_group: str) -> str:
+    """Delete a web app.
+    
+    Args:
+        name: Web app name
+        resource_group: Resource group containing the web app
+    """
+    logger.info("webapp_delete: %s/%s", resource_group, name)
+    if not name or not resource_group:
+        return "Error: name and resource_group are required"
+    try:
+        return await webapp.webapp_delete(name, resource_group)
+    except Exception as e:
+        logger.error("webapp_delete failed: %s", e)
+        return f"Error: {e}"
+
+
+# -- 17. RBAC (write) ---------------------------
+
+@mcp.tool()
+async def create_role_assignment(
+    principal_id: str,
+    role_definition_name: str,
+    resource_group: str = "",
+    scope: str = "",
+) -> str:
+    """Create a new role assignment (RBAC).
+    
+    Args:
+        principal_id: Object ID of the principal (user, group, or service principal)
+        role_definition_name: Role name (e.g., 'Contributor', 'Reader', 'AcrPull')
+        resource_group: Resource group scope (optional, uses subscription if not provided)
+        scope: Full resource scope (optional, overrides resource_group)
+    """
+    logger.info("create_role_assignment: principal=%s, role=%s", principal_id, role_definition_name)
+    if not principal_id:
+        return "Error: principal_id is required"
+    try:
+        from .tools import cloud as cloud_tools
+        return await cloud_tools.create_role_assignment(
+            principal_id, role_definition_name, resource_group, scope
+        )
+    except Exception as e:
+        logger.error("create_role_assignment failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def delete_role_assignment(
+    assignment_id: str,
+) -> str:
+    """Delete a role assignment.
+    
+    Args:
+        assignment_id: Role assignment ID to delete
+    """
+    logger.info("delete_role_assignment: %s", assignment_id)
+    if not assignment_id:
+        return "Error: assignment_id is required"
+    try:
+        from .tools import cloud as cloud_tools
+        return await cloud_tools.delete_role_assignment(assignment_id)
+    except Exception as e:
+        logger.error("delete_role_assignment failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def list_role_assignments_for_principal(
+    principal_id: str,
+    resource_group: str = "",
+) -> str:
+    """List role assignments for a specific principal.
+    
+    Args:
+        principal_id: Object ID of the principal
+        resource_group: Resource group to filter by (optional)
+    """
+    logger.info("list_role_assignments_for_principal: %s", principal_id)
+    if not principal_id:
+        return "Error: principal_id is required"
+    try:
+        from .tools import cloud as cloud_tools
+        return await cloud_tools.list_role_assignments_for_principal(principal_id, resource_group)
+    except Exception as e:
+        logger.error("list_role_assignments_for_principal failed: %s", e)
         return f"Error: {e}"
 
 

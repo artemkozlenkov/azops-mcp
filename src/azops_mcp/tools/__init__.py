@@ -1,11 +1,8 @@
 """Infrastructure management tools for MCP."""
 
-from . import aad
-
-__all__ = ["aad"]
-
 from . import acr
 from . import aad
 from . import cloud
+from . import webapp
 
-__all__ = ["acr", "aad", "cloud"]
+__all__ = ["acr", "aad", "cloud", "webapp"]

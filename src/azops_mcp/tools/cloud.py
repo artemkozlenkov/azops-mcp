@@ -1060,6 +1060,166 @@ async def list_role_definitions() -> str:
         return error_msg
 
 
+async def create_role_assignment(
+    principal_id: str,
+    role_definition_name: str,
+    resource_group: Optional[str] = None,
+    scope: Optional[str] = None,
+) -> str:
+    """Create a new role assignment (RBAC).
+    
+    Args:
+        principal_id: Object ID of the principal (user, group, or service principal)
+        role_definition_name: Role name (e.g., 'Contributor', 'Reader', 'AcrPull')
+        resource_group: Resource group scope (optional, uses subscription if not provided)
+        scope: Full resource scope (optional, overrides resource_group)
+        
+    Returns:
+        Result of the role assignment creation
+    """
+    try:
+        authorization_client = _get_authorization_client()
+        subscription_id = get_subscription_id()
+        
+        # Determine scope
+        if scope:
+            scope = scope
+        elif resource_group:
+            scope = f"/subscriptions/{subscription_id}/resourceGroups/{resource_group}"
+        else:
+            scope = f"/subscriptions/{subscription_id}"
+        
+        # Get role definition ID by role name
+        roles = authorization_client.role_definitions.list(scope)
+        role_def_id = None
+        
+        for role_def in roles:
+            if role_def.role_name == role_definition_name:
+                role_def_id = role_def.id
+                break
+        
+        if not role_def_id:
+            return f"Error: Role '{role_definition_name}' not found at scope '{scope}'. Available roles can be listed with list_role_definitions."
+        
+        # Generate unique assignment name
+        import uuid
+        assignment_name = str(uuid.uuid4())
+        
+        # Create role assignment
+        from azure.mgmt.authorization.models import RoleAssignmentCreateParameters
+        
+        assignment_params = RoleAssignmentCreateParameters(
+            role_definition_id=role_def_id,
+            principal_id=principal_id,
+            principal_type="ServicePrincipal",
+        )
+        
+        authorization_client.role_assignments.create(
+            scope, assignment_name, assignment_params
+        )
+        
+        return (
+            f"Role assignment created successfully!\n"
+            f"{'='*60}\n"
+            f"Principal ID: {principal_id}\n"
+            f"Role: {role_definition_name}\n"
+            f"Scope: {scope}\n"
+            f"Assignment ID: {assignment_name}"
+        )
+        
+    except ImportError as e:
+        return str(e)
+    except Exception as e:
+        error_msg = format_error_message(e, f"Failed to create role assignment for principal '{principal_id}'")
+        logger.error(error_msg)
+        return error_msg
+
+
+async def delete_role_assignment(assignment_id: str) -> str:
+    """Delete a role assignment.
+    
+    Args:
+        assignment_id: Role assignment ID to delete
+        
+    Returns:
+        Result of the deletion
+    """
+    try:
+        authorization_client = _get_authorization_client()
+        
+        # Parse assignment ID to get scope and assignment name
+        parts = assignment_id.split("/")
+        if len(parts) < 9:
+            return "Error: Invalid assignment_id format"
+        
+        # Get the last part as assignment name
+        assignment_name = parts[-1]
+        
+        # Remove assignment name from parts to get scope
+        scope = "/".join(parts[:-1])
+        
+        authorization_client.role_assignments.delete(scope, assignment_name)
+        
+        return f"Role assignment '{assignment_id}' deleted successfully."
+        
+    except ImportError as e:
+        return str(e)
+    except Exception as e:
+        error_msg = format_error_message(e, f"Failed to delete role assignment '{assignment_id}'")
+        logger.error(error_msg)
+        return error_msg
+
+
+async def list_role_assignments_for_principal(
+    principal_id: str,
+    resource_group: Optional[str] = None,
+) -> str:
+    """List role assignments for a specific principal.
+    
+    Args:
+        principal_id: Object ID of the principal
+        resource_group: Resource group to filter by (optional)
+        
+    Returns:
+        Formatted list of role assignments
+    """
+    try:
+        authorization_client = _get_authorization_client()
+        subscription_id = get_subscription_id()
+        
+        if resource_group:
+            scope = f"/subscriptions/{subscription_id}/resourceGroups/{resource_group}"
+            assignments = authorization_client.role_assignments.list_for_scope(scope)
+        else:
+            assignments = authorization_client.role_assignments.list_for_subscription()
+        
+        # Filter by principal ID
+        filtered = [a for a in assignments if a.principal_id == principal_id]
+        
+        if not filtered:
+            return f"No role assignments found for principal '{principal_id}'."
+        
+        formatted = []
+        for assignment in filtered:
+            # Get role definition name
+            role_id = assignment.role_definition_id.split("/")[-1] if assignment.role_definition_id else "N/A"
+            formatted.append(
+                f"Scope: {assignment.scope}\n"
+                f"Role ID: {role_id}\n"
+                f"Principal: {principal_id}\n"
+                f"Assignment ID: {assignment.name}"
+            )
+        
+        return f"Role Assignments for Principal '{principal_id}':\n\n" + "\n---\n".join(formatted)
+        
+    except ImportError as e:
+        return str(e)
+    except Exception as e:
+        error_msg = format_error_message(e, f"Failed to list role assignments for principal '{principal_id}'")
+        logger.error(error_msg)
+        return error_msg
+
+
 async def list_resource_locks(resource_group: Optional[str] = None) -> str:
     """List resource locks in the subscription or a resource group.
     

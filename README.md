@@ -10,7 +10,11 @@ A Model Context Protocol (MCP) server for managing Azure infrastructure directly
 - **Control VMs** - Start, stop, restart, deallocate virtual machines
 - **Scale VMSS** - Adjust VM Scale Set capacity
 - **Manage Storage** - List and inspect storage accounts
-- **Governance** - Work with management groups, RBAC, and resource locks
+- **Deploy Web Apps** - Create and manage Web Apps for Containers with Docker/Podman
+- **Container Registry** - List, create, and manage ACR instances and container images
+- **Virtual Networks** - Create and manage VNets, subnets, and peerings
+- **Identity & Access** - Manage Azure AD users, groups, and RBAC permissions
+- **Governance** - Work with management groups, resource locks, and tags
 - **Audit** - View activity logs and track changes
 
 ## Quick Start
@@ -83,20 +87,22 @@ User: What VMs are running in my dev resource group?
 
 See the [Authentication docs](https://artemkozlenkov.github.io/azops-mcp/authentication) for the full walkthrough.
 
-## Available Tools (26)
+## Available Tools (40+)
 
 | Category | Tools |
 |:---------|:------|
 | Health | `health_check` |
 | Subscriptions & Auth | `list_subscriptions`, `set_subscription`, `auth_status`, `account_show`, `account_clear`, `account_get_access_token`, `list_locations`, `list_tenants` |
 | Management Groups | `list_management_groups`, `get_management_group` |
-| RBAC | `list_role_definitions` |
-| Locks | `list_resource_locks` |
-| Tags | `list_tags` |
-| Activity Log | `get_activity_log` |
+| RBAC | `list_role_definitions`, `create_role_assignment`, `delete_role_assignment`, `list_role_assignments_for_principal` |
+| Access | `list_resource_locks`, `list_tags`, `get_activity_log` |
 | Resource Groups | `list_resource_groups`, `list_resources` |
 | VMs | `list_vms`, `get_vm_status`, `start_vm`, `stop_vm`, `restart_vm`, `deallocate_vm`, `scale_vmss` |
 | Storage | `list_storage_accounts`, `get_storage_status` |
+| App Service | `appservice_plan_list`, `appservice_plan_show`, `webapp_list`, `webapp_show`, `webapp_start`, `webapp_stop`, `webapp_restart` |
+| Web Apps for Containers | `webapp_create_for_container`, `webapp_grant_cr_access`, `webapp_configure_vnet_integration`, `webapp_assign_identity`, `webapp_view_logs`, `webapp_set_container_registry_credentials`, `webapp_delete` |
+| Container Registry | `acr_list_registries`, `acr_show_registry`, `acr_create_registry`, `acr_delete_registry`, `acr_get_credentials`, `acr_get_login_server`, `acr_list_repositories`, `acr_list_tags`, `acr_list_builds` |
+| Virtual Networks | `vnet_list`, `vnet_show`, `vnet_create`, `vnet_delete`, `vnet_subnet_list`, `vnet_subnet_show`, `vnet_subnet_create`, `vnet_subnet_delete`, `vnet_peering_list` |
 
 ## Docker
 

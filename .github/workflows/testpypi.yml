@@ -1,0 +1,49 @@
+name: Publish to TestPyPI
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: read
+
+jobs:
+  publish:
+    name: Build & publish to TestPyPI
+    if: github.event.review.state == 'approved'
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/azops-mcp
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tools
+        run: uv pip install build --system
+
+      - name: Set dev version from PR number
+        run: |
+          BASE=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          DEV_VERSION="${BASE}.dev${{ github.event.pull_request.number }}"
+          sed -i "s/^version = \".*\"/version = \"${DEV_VERSION}\"/" pyproject.toml
+          echo "Publishing version ${DEV_VERSION}"
+
+      - name: Build sdist and wheel
+        run: python -m build
+
+      - name: Publish to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/

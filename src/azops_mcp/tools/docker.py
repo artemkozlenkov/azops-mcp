@@ -38,12 +38,7 @@ async def list_containers() -> str:
             parts = line.split("\t")
             if len(parts) >= 4:
                 container_id, name, status, image = parts[0], parts[1], parts[2], parts[3]
-                formatted_containers.append(
-                    f"ID: {container_id[:12]}\n"
-                    f"Name: {name}\n"
-                    f"Status: {status}\n"
-                    f"Image: {image}"
-                )
+                formatted_containers.append(f"ID: {container_id[:12]}\nName: {name}\nStatus: {status}\nImage: {image}")
 
         return "Running Containers:\n\n" + "\n---\n".join(formatted_containers)
 

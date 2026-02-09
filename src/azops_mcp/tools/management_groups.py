@@ -21,11 +21,7 @@ async def list_management_groups() -> str:
 
         formatted = []
         for group in groups:
-            formatted.append(
-                f"Display Name: {group.display_name or 'N/A'}\n"
-                f"Name/ID: {group.name}\n"
-                f"Type: {group.type}"
-            )
+            formatted.append(f"Display Name: {group.display_name or 'N/A'}\nName/ID: {group.name}\nType: {group.type}")
 
         if not formatted:
             return "No management groups found."
@@ -55,7 +51,7 @@ async def get_management_group(group_id: str) -> str:
 
         output = (
             f"Management Group:\n"
-            f"{'='*50}\n"
+            f"{'=' * 50}\n"
             f"Display Name: {group.display_name or 'N/A'}\n"
             f"Name/ID: {group.name}\n"
             f"Type: {group.type}\n"
@@ -65,11 +61,7 @@ async def get_management_group(group_id: str) -> str:
         if group.children:
             output += f"\nChildren ({len(group.children)}):\n"
             for child in group.children:
-                child_type = (
-                    "Subscription"
-                    if child.type and "/subscriptions/" in child.type
-                    else "Management Group"
-                )
+                child_type = "Subscription" if child.type and "/subscriptions/" in child.type else "Management Group"
                 output += f"  - {child.display_name or child.name} ({child_type})\n"
         else:
             output += "\nChildren: None\n"
@@ -79,9 +71,7 @@ async def get_management_group(group_id: str) -> str:
     except ImportError as e:
         return str(e)
     except Exception as e:
-        error_msg = format_error_message(
-            e, f"Failed to get management group '{group_id}'"
-        )
+        error_msg = format_error_message(e, f"Failed to get management group '{group_id}'")
         logger.error(error_msg)
         return error_msg
 
@@ -106,18 +96,14 @@ async def create_management_group(
 
         create_request: dict[str, Any] = {"display_name": display_name}
         if parent_id:
-            create_request["parent_id"] = (
-                f"/providers/Microsoft.Management/managementGroups/{parent_id}"
-            )
+            create_request["parent_id"] = f"/providers/Microsoft.Management/managementGroups/{parent_id}"
 
-        poller = client.management_groups.begin_create_or_update(
-            group_id, create_request
-        )
+        poller = client.management_groups.begin_create_or_update(group_id, create_request)
         result = poller.result()
 
         return (
             f"Management group created successfully!\n"
-            f"{'='*50}\n"
+            f"{'=' * 50}\n"
             f"Display Name: {result.display_name or display_name}\n"
             f"ID: {result.name or group_id}\n"
             f"Type: {result.type}"
@@ -126,9 +112,7 @@ async def create_management_group(
     except ImportError as e:
         return str(e)
     except Exception as e:
-        error_msg = format_error_message(
-            e, f"Failed to create management group '{group_id}'"
-        )
+        error_msg = format_error_message(e, f"Failed to create management group '{group_id}'")
         logger.error(error_msg)
         return error_msg
 
@@ -154,8 +138,6 @@ async def delete_management_group(group_id: str) -> str:
     except ImportError as e:
         return str(e)
     except Exception as e:
-        error_msg = format_error_message(
-            e, f"Failed to delete management group '{group_id}'"
-        )
+        error_msg = format_error_message(e, f"Failed to delete management group '{group_id}'")
         logger.error(error_msg)
         return error_msg

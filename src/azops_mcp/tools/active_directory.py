@@ -13,6 +13,7 @@ def set_aad_subscription(subscription_id: str) -> None:
     """Set the subscription ID and clear AAD client cache."""
     global _aad_client
     from ._clients import set_subscription_id
+
     set_subscription_id(subscription_id)
     _aad_client = None
     logger.info("Azure AD client cache cleared")
@@ -21,12 +22,14 @@ def set_aad_subscription(subscription_id: str) -> None:
 def get_aad_subscription() -> Optional[str]:
     """Get the active subscription ID."""
     from ._clients import get_subscription_id
+
     return get_subscription_id()
 
 
 def clear_aad_subscription() -> None:
     """Clear the runtime subscription ID override."""
     from ._clients import clear_subscription_id
+
     clear_subscription_id()
 
 
@@ -55,13 +58,13 @@ def _get_aad_client():
             # Try alternative import paths
             try:
                 from microsoft_graph import GraphServiceClient
+
                 credential = _get_azure_credential()
                 scopes = ["https://graph.microsoft.com/.default"]
                 _aad_client = GraphServiceClient(credential=credential, scopes=scopes)
             except ImportError as e:
                 raise ImportError(
-                    "Microsoft Graph SDK not installed. "
-                    "Run: pip install msgraph-sdk azure-identity"
+                    "Microsoft Graph SDK not installed. Run: pip install msgraph-sdk azure-identity"
                 ) from e
     return _aad_client
 
@@ -106,11 +109,11 @@ async def list_users(filter: str = "", top: int = 50) -> str:
                 f"Object ID: {user.id or 'N/A'}",
                 f"Account Enabled: {user.account_enabled if hasattr(user, 'account_enabled') else 'N/A'}",
             ]
-            if hasattr(user, 'job_title') and user.job_title:
+            if hasattr(user, "job_title") and user.job_title:
                 user_info.append(f"Job Title: {user.job_title}")
-            if hasattr(user, 'department') and user.department:
+            if hasattr(user, "department") and user.department:
                 user_info.append(f"Department: {user.department}")
-            if hasattr(user, 'mail') and user.mail:
+            if hasattr(user, "mail") and user.mail:
                 user_info.append(f"Email: {user.mail}")
             formatted_users.append("\n".join(user_info))
 
@@ -155,22 +158,27 @@ async def show_user(user_id: str, user_principal_name: str = "") -> str:
 
         # Add optional fields
         optional_fields = [
-            'job_title', 'department', 'mail', 'mobile_phone',
-            'business_phones', 'office_location', 'preferred_language'
+            "job_title",
+            "department",
+            "mail",
+            "mobile_phone",
+            "business_phones",
+            "office_location",
+            "preferred_language",
         ]
         for field in optional_fields:
             if hasattr(user, field) and getattr(user, field):
-                field_name = field.replace('_', ' ').title()
+                field_name = field.replace("_", " ").title()
                 details.append(f"{field_name}: {getattr(user, field)}")
 
         # Add address if present
-        if hasattr(user, 'address') and user.address:
+        if hasattr(user, "address") and user.address:
             addr = user.address
             address_str = ", ".join(str(v) for v in vars(addr).values() if v)
             if address_str:
                 details.append(f"Address: {address_str}")
 
-        return f"Azure AD User:\n{'='*50}\n" + "\n".join(details)
+        return f"Azure AD User:\n{'=' * 50}\n" + "\n".join(details)
 
     except ImportError as e:
         return str(e)
@@ -235,7 +243,7 @@ async def create_user(
 
         return (
             f"User created successfully!\n"
-            f"{'='*50}\n"
+            f"{'=' * 50}\n"
             f"Display Name: {new_user.display_name or 'N/A'}\n"
             f"User Principal Name: {new_user.user_principal_name or 'N/A'}\n"
             f"Object ID: {new_user.id or 'N/A'}\n"
@@ -271,9 +279,7 @@ async def delete_user(user_id: str, user_principal_name: str = "") -> str:
         user_id_to_delete = user_id
         if not user_id_to_delete and user_principal_name:
             # First find the user by UPN
-            users = await client.users.get(
-                query_params={"$filter": f"userPrincipalName eq '{user_principal_name}'"}
-            )
+            users = await client.users.get(query_params={"$filter": f"userPrincipalName eq '{user_principal_name}'"})
             if users and users.value:
                 user_id_to_delete = users.value[0].id
             else:
@@ -370,7 +376,7 @@ async def create_application(
 
         return (
             f"Application created successfully!\n"
-            f"{'='*50}\n"
+            f"{'=' * 50}\n"
             f"Display Name: {new_app.display_name or 'N/A'}\n"
             f"App ID: {new_app.app_id or 'N/A'}\n"
             f"Object ID: {new_app.id or 'N/A'}\n"
@@ -444,7 +450,7 @@ async def verify_tenant() -> str:
 
         return (
             f"Azure AD Tenant Information:\n"
-            f"{'='*50}\n"
+            f"{'=' * 50}\n"
             f"Tenant ID: {tenant.id or 'N/A'}\n"
             f"Display Name: {tenant.display_name or 'N/A'}\n"
             f"Country: {tenant.country or 'N/A'}\n"

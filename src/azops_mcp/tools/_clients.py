@@ -192,9 +192,7 @@ def _get_subscription_client():
                 credential=_get_azure_credential(),
             )
         except ImportError as e:
-            raise ImportError(
-                "Azure Subscription SDK not installed. Run: pip install azure-mgmt-subscription"
-            ) from e
+            raise ImportError("Azure Subscription SDK not installed. Run: pip install azure-mgmt-subscription") from e
     return _subscription_client
 
 
@@ -251,9 +249,7 @@ def _get_authorization_client():
                 subscription_id=subscription_id,
             )
         except ImportError as e:
-            raise ImportError(
-                "Azure Authorization SDK not installed. Run: pip install azure-mgmt-authorization"
-            ) from e
+            raise ImportError("Azure Authorization SDK not installed. Run: pip install azure-mgmt-authorization") from e
     return _authorization_client
 
 

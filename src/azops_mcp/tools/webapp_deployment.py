@@ -92,9 +92,7 @@ async def webapp_create_for_container(
                     "capacity": 1,
                 },
             }
-            poller = web_client.app_service_plans.begin_create_or_update(
-                resource_group, plan_name, plan_params
-            )
+            poller = web_client.app_service_plans.begin_create_or_update(resource_group, plan_name, plan_params)
             plan = poller.result()
             logger.info(f"App Service Plan '{plan_name}' created")
 
@@ -104,7 +102,9 @@ async def webapp_create_for_container(
         if os_type == "linux":
             if image:
                 app_settings.append({"name": "WEBSITES_ENABLE_APP_SERVICE_STORAGE", "value": "false"})
-                app_settings.append({"name": "DOCKER_REGISTRY_SERVER_URL", "value": f"https://{registry_url}" if registry_url else ""})
+                app_settings.append(
+                    {"name": "DOCKER_REGISTRY_SERVER_URL", "value": f"https://{registry_url}" if registry_url else ""}
+                )
                 app_settings.append({"name": "DOCKER_ENABLE_CI", "value": "false"})
 
                 if assign_identity:
@@ -165,7 +165,7 @@ async def webapp_create_for_container(
 
         output = (
             f"Web App for Containers created successfully!\n"
-            f"{'='*60}\n"
+            f"{'=' * 60}\n"
             f"Name: {result.name}\n"
             f"Resource Group: {resource_group}\n"
             f"Location: {result.location}\n"
@@ -175,7 +175,7 @@ async def webapp_create_for_container(
             f"SKU: {plan_sku} ({plan_tier})\n"
             f"OS: {os_type.capitalize()}\n"
             f"Container Image: {image if image else 'Not configured'}\n"
-            f"{'='*60}\n"
+            f"{'=' * 60}\n"
             f"\nConnection Strings:\n"
         )
 
@@ -232,18 +232,20 @@ async def webapp_configure_vnet_integration(webapp_name: str, resource_group: st
         # Configure VNet integration
 
         web_client.web_apps.begin_create_or_update_configuration(
-            resource_group, webapp_name, {
+            resource_group,
+            webapp_name,
+            {
                 "properties": {
                     "vnet_name": vnet_name,
                     "vnet_resource_group": resource_group,
                     "vnet_subnet_name": subnet_name,
                 }
-            }
+            },
         )
 
         return (
             f"VNet integration configured for '{webapp_name}'\n"
-            f"{'='*60}\n"
+            f"{'=' * 60}\n"
             f"Subnet: {subnet_name}\n"
             f"VNet: {vnet_name}\n"
             f"Resource Group: {resource_group}\n"
@@ -284,7 +286,7 @@ async def webapp_assign_identity(webapp_name: str, resource_group: str) -> str:
 
         output = (
             f"Managed identity assigned to '{webapp_name}'\n"
-            f"{'='*60}\n"
+            f"{'=' * 60}\n"
             f"Principal ID: {result.identity.principal_id or 'N/A'}\n"
             f"Tenant ID: {result.identity.tenant_id or 'N/A'}\n"
             f"Type: {result.identity.type or 'N/A'}\n"
@@ -336,9 +338,7 @@ async def webapp_set_container_registry_credentials(
             }
         }
 
-        web_client.web_apps.update_configuration(
-            resource_group, webapp_name, container_settings
-        )
+        web_client.web_apps.update_configuration(resource_group, webapp_name, container_settings)
 
         # Update app settings
         app_settings = [
@@ -348,13 +348,11 @@ async def webapp_set_container_registry_credentials(
             {"name": "DOCKER_REGISTRY_SERVER_PASSWORD", "value": password},
         ]
 
-        web_client.web_apps.update_application_settings(
-            resource_group, webapp_name, app_settings
-        )
+        web_client.web_apps.update_application_settings(resource_group, webapp_name, app_settings)
 
         return (
             f"Container registry credentials configured for '{webapp_name}'\n"
-            f"{'='*60}\n"
+            f"{'=' * 60}\n"
             f"Registry URL: {registry_url}\n"
             f"Username: {username}\n"
             f"OS Type: {os_type}"
@@ -430,15 +428,14 @@ async def webapp_grant_cr_access(
 
         # Generate unique assignment name
         import uuid
+
         assignment_name = str(uuid.uuid4())
 
-        authorization_client.role_assignments.create(
-            scope, assignment_name, assignment_params
-        )
+        authorization_client.role_assignments.create(scope, assignment_name, assignment_params)
 
         return (
             f"RBAC permission granted for '{webapp_name}' to access '{registry_name}'\n"
-            f"{'='*60}\n"
+            f"{'=' * 60}\n"
             f"Web App: {webapp_name}\n"
             f"Registry: {registry_name}\n"
             f"Role: {role}\n"
@@ -508,12 +505,7 @@ async def webapp_view_logs(webapp_name: str, resource_group: str, days: int = 1)
             status = log.status.localized_value if log.status else "N/A"
             caller = log.caller or "N/A"
 
-            formatted.append(
-                f"Time: {timestamp}\n"
-                f"Operation: {operation}\n"
-                f"Status: {status}\n"
-                f"Caller: {caller}"
-            )
+            formatted.append(f"Time: {timestamp}\nOperation: {operation}\nStatus: {status}\nCaller: {caller}")
 
         if not formatted:
             return f"No log entries found for '{webapp_name}' in the last {days} day(s)."

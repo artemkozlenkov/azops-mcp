@@ -83,7 +83,7 @@ async def vnet_show(name: str, resource_group: str) -> str:
 
         output = (
             f"Virtual Network:\n"
-            f"{'='*50}\n"
+            f"{'=' * 50}\n"
             f"Name: {vnet.name}\n"
             f"Resource Group: {resource_group}\n"
             f"Location: {vnet.location}\n"
@@ -101,21 +101,13 @@ async def vnet_show(name: str, resource_group: str) -> str:
                 prefix = subnet.address_prefix or (
                     ", ".join(subnet.address_prefixes) if subnet.address_prefixes else "N/A"
                 )
-                nsg_name = (
-                    subnet.network_security_group.id.split("/")[-1]
-                    if subnet.network_security_group
-                    else "None"
-                )
+                nsg_name = subnet.network_security_group.id.split("/")[-1] if subnet.network_security_group else "None"
                 output += f"  - {subnet.name}: {prefix} (NSG: {nsg_name})\n"
 
         if vnet.virtual_network_peerings:
             output += f"\nPeerings ({len(vnet.virtual_network_peerings)}):\n"
             for peering in vnet.virtual_network_peerings:
-                remote = (
-                    peering.remote_virtual_network.id.split("/")[-1]
-                    if peering.remote_virtual_network
-                    else "N/A"
-                )
+                remote = peering.remote_virtual_network.id.split("/")[-1] if peering.remote_virtual_network else "N/A"
                 output += f"  - {peering.name}: -> {remote} (State: {peering.peering_state or 'N/A'})\n"
 
         return output
@@ -160,9 +152,7 @@ async def vnet_create(
             "subnets": [{"name": "default", "address_prefix": default_subnet_prefix}],
         }
 
-        poller = network_client.virtual_networks.begin_create_or_update(
-            resource_group, name, vnet_params
-        )
+        poller = network_client.virtual_networks.begin_create_or_update(resource_group, name, vnet_params)
         result = poller.result()
 
         address_space = "N/A"
@@ -175,7 +165,7 @@ async def vnet_create(
 
         return (
             f"Virtual network created successfully!\n"
-            f"{'='*50}\n"
+            f"{'=' * 50}\n"
             f"Name: {result.name}\n"
             f"Resource Group: {resource_group}\n"
             f"Location: {result.location}\n"
@@ -232,17 +222,9 @@ async def vnet_subnet_list(vnet_name: str, resource_group: str) -> str:
 
         formatted = []
         for subnet in subnets:
-            prefix = subnet.address_prefix or (
-                ", ".join(subnet.address_prefixes) if subnet.address_prefixes else "N/A"
-            )
-            nsg_name = (
-                subnet.network_security_group.id.split("/")[-1]
-                if subnet.network_security_group
-                else "None"
-            )
-            delegations = (
-                ", ".join(d.service_name for d in (subnet.delegations or [])) or "None"
-            )
+            prefix = subnet.address_prefix or (", ".join(subnet.address_prefixes) if subnet.address_prefixes else "N/A")
+            nsg_name = subnet.network_security_group.id.split("/")[-1] if subnet.network_security_group else "None"
+            delegations = ", ".join(d.service_name for d in (subnet.delegations or [])) or "None"
             formatted.append(
                 f"Name: {subnet.name}\n"
                 f"Address Prefix: {prefix}\n"
@@ -264,9 +246,7 @@ async def vnet_subnet_list(vnet_name: str, resource_group: str) -> str:
         return error_msg
 
 
-async def vnet_subnet_show(
-    vnet_name: str, subnet_name: str, resource_group: str
-) -> str:
+async def vnet_subnet_show(vnet_name: str, subnet_name: str, resource_group: str) -> str:
     """Show subnet details.
 
     Args:
@@ -281,29 +261,17 @@ async def vnet_subnet_show(
         network_client = _get_network_client()
         subnet = network_client.subnets.get(resource_group, vnet_name, subnet_name)
 
-        prefix = subnet.address_prefix or (
-            ", ".join(subnet.address_prefixes) if subnet.address_prefixes else "N/A"
-        )
-        nsg_name = (
-            subnet.network_security_group.id.split("/")[-1]
-            if subnet.network_security_group
-            else "None"
-        )
-        route_table = (
-            subnet.route_table.id.split("/")[-1] if subnet.route_table else "None"
-        )
-        delegations = (
-            ", ".join(d.service_name for d in (subnet.delegations or [])) or "None"
-        )
-        service_endpoints = (
-            ", ".join(ep.service for ep in (subnet.service_endpoints or [])) or "None"
-        )
+        prefix = subnet.address_prefix or (", ".join(subnet.address_prefixes) if subnet.address_prefixes else "N/A")
+        nsg_name = subnet.network_security_group.id.split("/")[-1] if subnet.network_security_group else "None"
+        route_table = subnet.route_table.id.split("/")[-1] if subnet.route_table else "None"
+        delegations = ", ".join(d.service_name for d in (subnet.delegations or [])) or "None"
+        service_endpoints = ", ".join(ep.service for ep in (subnet.service_endpoints or [])) or "None"
         ip_configs = len(subnet.ip_configurations) if subnet.ip_configurations else 0
         private_endpoint_policy = subnet.private_endpoint_network_policies or "N/A"
 
         return (
             f"Subnet:\n"
-            f"{'='*50}\n"
+            f"{'=' * 50}\n"
             f"Name: {subnet.name}\n"
             f"VNet: {vnet_name}\n"
             f"Resource Group: {resource_group}\n"
@@ -347,14 +315,12 @@ async def vnet_subnet_create(
         network_client = _get_network_client()
         subnet_params = {"address_prefix": address_prefix}
 
-        poller = network_client.subnets.begin_create_or_update(
-            resource_group, vnet_name, subnet_name, subnet_params
-        )
+        poller = network_client.subnets.begin_create_or_update(resource_group, vnet_name, subnet_name, subnet_params)
         result = poller.result()
 
         return (
             f"Subnet created successfully!\n"
-            f"{'='*50}\n"
+            f"{'=' * 50}\n"
             f"Name: {result.name}\n"
             f"VNet: {vnet_name}\n"
             f"Address Prefix: {result.address_prefix}\n"
@@ -370,9 +336,7 @@ async def vnet_subnet_create(
         return error_msg
 
 
-async def vnet_subnet_delete(
-    vnet_name: str, subnet_name: str, resource_group: str
-) -> str:
+async def vnet_subnet_delete(vnet_name: str, subnet_name: str, resource_group: str) -> str:
     """Delete a subnet from a virtual network.
 
     Args:
@@ -385,9 +349,7 @@ async def vnet_subnet_delete(
     """
     try:
         network_client = _get_network_client()
-        poller = network_client.subnets.begin_delete(
-            resource_group, vnet_name, subnet_name
-        )
+        poller = network_client.subnets.begin_delete(resource_group, vnet_name, subnet_name)
         poller.result()
         return f"Subnet '{subnet_name}' deleted from VNet '{vnet_name}'."
 
@@ -411,17 +373,11 @@ async def vnet_peering_list(vnet_name: str, resource_group: str) -> str:
     """
     try:
         network_client = _get_network_client()
-        peerings = network_client.virtual_network_peerings.list(
-            resource_group, vnet_name
-        )
+        peerings = network_client.virtual_network_peerings.list(resource_group, vnet_name)
 
         formatted = []
         for p in peerings:
-            remote = (
-                p.remote_virtual_network.id.split("/")[-1]
-                if p.remote_virtual_network
-                else "N/A"
-            )
+            remote = p.remote_virtual_network.id.split("/")[-1] if p.remote_virtual_network else "N/A"
             remote_rg = (
                 p.remote_virtual_network.id.split("/")[4]
                 if p.remote_virtual_network and p.remote_virtual_network.id

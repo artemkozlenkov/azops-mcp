@@ -1,6 +1,5 @@
 """Tests for health check and rate limiting."""
 
-
 import pytest
 
 from azops_mcp import server

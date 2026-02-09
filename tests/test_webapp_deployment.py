@@ -13,7 +13,9 @@ class TestWebappCreateForContainer:
     @pytest.mark.asyncio
     async def test_create_for_container_success(self):
         """Test webapp_create_for_container creates a web app."""
-        with patch.object(server.webapp_deployment, "webapp_create_for_container", new_callable=AsyncMock) as mock_create:
+        with patch.object(
+            server.webapp_deployment, "webapp_create_for_container", new_callable=AsyncMock
+        ) as mock_create:
             mock_create.return_value = "Web App for Containers created successfully!"
             result = await server.webapp_create_for_container(
                 name="my-app",
@@ -28,7 +30,9 @@ class TestWebappCreateForContainer:
     @pytest.mark.asyncio
     async def test_create_for_container_handles_exception(self):
         """Test webapp_create_for_container handles exceptions gracefully."""
-        with patch.object(server.webapp_deployment, "webapp_create_for_container", new_callable=AsyncMock) as mock_create:
+        with patch.object(
+            server.webapp_deployment, "webapp_create_for_container", new_callable=AsyncMock
+        ) as mock_create:
             mock_create.side_effect = Exception("Deployment failed")
             result = await server.webapp_create_for_container(
                 name="my-app",
@@ -65,9 +69,13 @@ class TestWebappConfigureVnetIntegration:
     @pytest.mark.asyncio
     async def test_configure_vnet_success(self):
         """Test webapp_configure_vnet_integration succeeds."""
-        with patch.object(server.webapp_deployment, "webapp_configure_vnet_integration", new_callable=AsyncMock) as mock_vnet:
+        with patch.object(
+            server.webapp_deployment, "webapp_configure_vnet_integration", new_callable=AsyncMock
+        ) as mock_vnet:
             mock_vnet.return_value = "VNet integration configured"
-            result = await server.webapp_configure_vnet_integration("my-app", "my-rg", "/subscriptions/.../subnets/default")
+            result = await server.webapp_configure_vnet_integration(
+                "my-app", "my-rg", "/subscriptions/.../subnets/default"
+            )
 
             assert "Error" not in result
             mock_vnet.assert_called_once()

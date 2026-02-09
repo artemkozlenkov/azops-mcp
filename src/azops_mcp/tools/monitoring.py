@@ -16,7 +16,6 @@ async def get_system_metrics() -> str:
         Formatted system metrics
     """
     try:
-
         # Get CPU usage (simplified - in production, use psutil or similar)
         if platform.system() == "Linux":
             # Linux CPU usage
@@ -73,12 +72,7 @@ async def get_system_metrics() -> str:
         )
         disk_info = result.stdout if result.returncode == 0 else "Disk: Unable to determine"
 
-        return (
-            f"System Metrics:\n\n"
-            f"{cpu_info}\n\n"
-            f"Memory:\n{memory_info}\n\n"
-            f"Disk Usage:\n{disk_info}"
-        )
+        return f"System Metrics:\n\n{cpu_info}\n\nMemory:\n{memory_info}\n\nDisk Usage:\n{disk_info}"
 
     except Exception as e:
         error_msg = format_error_message(e, "Failed to get system metrics")

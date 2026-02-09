@@ -36,11 +36,7 @@ async def list_role_assignments(resource_group: Optional[str] = None) -> str:
         for assignment in assignments:
             principal_id = assignment.principal_id or "N/A"
             principal_type = assignment.principal_type or "N/A"
-            role_id = (
-                assignment.role_definition_id.split("/")[-1]
-                if assignment.role_definition_id
-                else "N/A"
-            )
+            role_id = assignment.role_definition_id.split("/")[-1] if assignment.role_definition_id else "N/A"
             formatted.append(
                 f"Principal: {principal_id} ({principal_type})\n"
                 f"Role Definition ID: {role_id}\n"
@@ -83,11 +79,7 @@ async def list_role_definitions() -> str:
         for role in roles:
             if role.role_type == "BuiltInRole":
                 desc = (role.description[:100] + "...") if role.description else "N/A"
-                formatted.append(
-                    f"Name: {role.role_name}\n"
-                    f"ID: {role.name}\n"
-                    f"Description: {desc}"
-                )
+                formatted.append(f"Name: {role.role_name}\nID: {role.name}\nDescription: {desc}")
 
         if not formatted:
             return "No built-in role definitions found."
@@ -158,13 +150,11 @@ async def create_role_assignment(
             principal_type="ServicePrincipal",
         )
 
-        authorization_client.role_assignments.create(
-            target_scope, assignment_name, assignment_params
-        )
+        authorization_client.role_assignments.create(target_scope, assignment_name, assignment_params)
 
         return (
             f"Role assignment created successfully!\n"
-            f"{'='*60}\n"
+            f"{'=' * 60}\n"
             f"Principal ID: {principal_id}\n"
             f"Role: {role_definition_name}\n"
             f"Scope: {target_scope}\n"
@@ -174,9 +164,7 @@ async def create_role_assignment(
     except ImportError as e:
         return str(e)
     except Exception as e:
-        error_msg = format_error_message(
-            e, f"Failed to create role assignment for principal '{principal_id}'"
-        )
+        error_msg = format_error_message(e, f"Failed to create role assignment for principal '{principal_id}'")
         logger.error(error_msg)
         return error_msg
 
@@ -207,9 +195,7 @@ async def delete_role_assignment(assignment_id: str) -> str:
     except ImportError as e:
         return str(e)
     except Exception as e:
-        error_msg = format_error_message(
-            e, f"Failed to delete role assignment '{assignment_id}'"
-        )
+        error_msg = format_error_message(e, f"Failed to delete role assignment '{assignment_id}'")
         logger.error(error_msg)
         return error_msg
 
@@ -247,11 +233,7 @@ async def list_role_assignments_for_principal(
 
         formatted = []
         for assignment in filtered:
-            role_id = (
-                assignment.role_definition_id.split("/")[-1]
-                if assignment.role_definition_id
-                else "N/A"
-            )
+            role_id = assignment.role_definition_id.split("/")[-1] if assignment.role_definition_id else "N/A"
             formatted.append(
                 f"Scope: {assignment.scope}\n"
                 f"Role ID: {role_id}\n"
@@ -264,8 +246,6 @@ async def list_role_assignments_for_principal(
     except ImportError as e:
         return str(e)
     except Exception as e:
-        error_msg = format_error_message(
-            e, f"Failed to list role assignments for principal '{principal_id}'"
-        )
+        error_msg = format_error_message(e, f"Failed to list role assignments for principal '{principal_id}'")
         logger.error(error_msg)
         return error_msg

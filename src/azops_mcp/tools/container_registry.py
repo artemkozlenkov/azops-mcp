@@ -35,8 +35,7 @@ def _get_acr_client():
             )
         except ImportError as e:
             raise ImportError(
-                "Azure Container Registry SDK not installed. "
-                "Run: pip install azure-mgmt-containerregistry"
+                "Azure Container Registry SDK not installed. Run: pip install azure-mgmt-containerregistry"
             ) from e
     return _acr_client
 
@@ -111,7 +110,7 @@ async def acr_show_registry(resource_group: str, registry_name: str) -> str:
 
         details = [
             "Azure Container Registry Details",
-            f"{'='*50}",
+            f"{'=' * 50}",
             f"Name: {reg.name}",
             f"Resource Group: {resource_group}",
             f"Location: {reg.location}",
@@ -119,18 +118,18 @@ async def acr_show_registry(resource_group: str, registry_name: str) -> str:
             f"ID: {reg.id}",
         ]
 
-        if hasattr(reg, 'admin_user_enabled') and reg.admin_user_enabled:
+        if hasattr(reg, "admin_user_enabled") and reg.admin_user_enabled:
             details.append("Admin User: Enabled")
         else:
             details.append("Admin User: Disabled")
 
-        if hasattr(reg, 'status') and reg.status:
+        if hasattr(reg, "status") and reg.status:
             details.append(f"Status: {reg.status}")
 
-        if hasattr(reg, 'creation_date') and reg.creation_date:
+        if hasattr(reg, "creation_date") and reg.creation_date:
             details.append(f"Creation Date: {reg.creation_date}")
 
-        if hasattr(reg, 'policies') and reg.policies:
+        if hasattr(reg, "policies") and reg.policies:
             details.append(f"Soft Delete Policies: {reg.policies}")
 
         return "\n".join(details)
@@ -188,7 +187,7 @@ async def acr_create_registry(
 
         output = [
             "Container Registry Created Successfully!",
-            f"{'='*50}",
+            f"{'=' * 50}",
             f"Name: {result.name}",
             f"Resource Group: {resource_group}",
             f"Location: {location}",
@@ -281,7 +280,7 @@ async def acr_update_registry(
 
         output = [
             "Container Registry Updated Successfully!",
-            f"{'='*50}",
+            f"{'=' * 50}",
             f"Name: {result.name}",
             f"Admin User: {'Enabled' if result.admin_user_enabled else 'Disabled'}",
         ]
@@ -311,7 +310,7 @@ async def acr_get_credentials(resource_group: str, registry_name: str) -> str:
 
         output = [
             "Container Registry Credentials",
-            f"{'='*50}",
+            f"{'=' * 50}",
             f"Username: {creds.username}",
         ]
 
@@ -342,7 +341,9 @@ async def acr_get_login_server(resource_group: str, registry_name: str) -> str:
 
         reg = client.registries.get_properties(resource_group, registry_name)
 
-        login_server = reg.login_server if hasattr(reg, 'login_server') and reg.login_server else f"{registry_name}.azurecr.io"
+        login_server = (
+            reg.login_server if hasattr(reg, "login_server") and reg.login_server else f"{registry_name}.azurecr.io"
+        )
 
         return f"Login Server: {login_server}"
 
@@ -374,10 +375,7 @@ async def acr_list_repositories(resource_group: str, registry_name: str) -> str:
 
         repo_list = []
         for repo in repos:
-            repo_list.append(
-                f"Name: {repo.name}\n"
-                f"Type: {repo.type if hasattr(repo, 'type') else 'N/A'}"
-            )
+            repo_list.append(f"Name: {repo.name}\nType: {repo.type if hasattr(repo, 'type') else 'N/A'}")
 
         if not repo_list:
             return f"No repositories found in registry '{registry_name}'."
@@ -406,12 +404,12 @@ async def acr_list_tags(resource_group: str, registry_name: str, repository: str
 
         tags = client.repositories.list_tags(resource_group, registry_name, repository)
 
-        if not hasattr(tags, '__iter__'):
+        if not hasattr(tags, "__iter__"):
             return f"No tags found in repository '{repository}'."
 
         tag_list = []
         for tag in tags:
-            if hasattr(tag, 'name'):
+            if hasattr(tag, "name"):
                 tag_list.append(f"Name: {tag.name}")
             elif isinstance(tag, str):
                 tag_list.append(f"Name: {tag}")
@@ -450,7 +448,7 @@ async def acr_show_task(resource_group: str, registry_name: str, task_name: str)
 
         output = [
             "Container Registry Task Details",
-            f"{'='*50}",
+            f"{'=' * 50}",
             f"Name: {task.name}",
             f"Resource Group: {resource_group}",
             f"Location: {task.location}",
@@ -551,7 +549,7 @@ async def acr_create_task(
 
         output = [
             "Container Registry Task Created Successfully!",
-            f"{'='*50}",
+            f"{'=' * 50}",
             f"Name: {result.name}",
             f"Resource Group: {resource_group}",
         ]
@@ -640,10 +638,10 @@ async def acr_list_builds(resource_group: str = "", registry_name: str = "") -> 
         if registry_name:
             # Try to list builds for a specific registry
             try:
-                if hasattr(client, 'builds'):
+                if hasattr(client, "builds"):
                     for build in client.builds.list(registry_name=registry_name):
                         builds.append(build)
-                elif hasattr(client, 'build_tasks'):
+                elif hasattr(client, "build_tasks"):
                     for build in client.build_tasks.list(registry_name=registry_name):
                         builds.append(build)
             except Exception as e:
@@ -691,13 +689,13 @@ async def acr_show_quotas(resource_group: str, registry_name: str) -> str:
 
         output = [
             "Container Registry Quotas",
-            f"{'='*50}",
+            f"{'=' * 50}",
         ]
 
-        if hasattr(quotas, 'storage_quota'):
+        if hasattr(quotas, "storage_quota"):
             output.append(f"Storage Quota: {quotas.storage_quota} bytes")
 
-        if hasattr(quotas, 'bandwidth_quota'):
+        if hasattr(quotas, "bandwidth_quota"):
             output.append(f"Bandwidth Quota: {quotas.bandwidth_quota}")
 
         return "\n".join(output)
@@ -725,7 +723,7 @@ async def acr_show_usage(resource_group: str, registry_name: str) -> str:
 
         output = [
             "Container Registry Usage",
-            f"{'='*50}",
+            f"{'=' * 50}",
         ]
 
         for usage in usages:
@@ -764,11 +762,13 @@ async def acr_list_network_rules(resource_group: str, registry_name: str) -> str
 
         output = [
             "Container Registry Network Rules",
-            f"{'='*50}",
+            f"{'=' * 50}",
         ]
 
-        if hasattr(reg, 'network_rule_set') and reg.network_rule_set:
-            output.append(f"Default Action: {reg.network_rule_set.default_action if hasattr(reg.network_rule_set, 'default_action') else 'N/A'}")
+        if hasattr(reg, "network_rule_set") and reg.network_rule_set:
+            output.append(
+                f"Default Action: {reg.network_rule_set.default_action if hasattr(reg.network_rule_set, 'default_action') else 'N/A'}"
+            )
         else:
             output.append("Network rules not configured.")
 
@@ -818,10 +818,7 @@ async def acr_update_network_rules(
             registry_update_parameters=params,
         )
 
-        return (
-            f"Network rules updated successfully!\n"
-            f"Default Action: {default_action}"
-        )
+        return f"Network rules updated successfully!\nDefault Action: {default_action}"
 
     except Exception as e:
         error_msg = f"Failed to update network rules: {str(e)}"

@@ -55,7 +55,7 @@ async def appservice_plan_show(name: str, resource_group: str) -> str:
 
         return (
             f"App Service Plan:\n"
-            f"{'='*50}\n"
+            f"{'=' * 50}\n"
             f"Name: {plan.name}\n"
             f"Resource Group: {resource_group}\n"
             f"Location: {plan.location}\n"
@@ -125,7 +125,7 @@ async def webapp_show(name: str, resource_group: str) -> str:
 
         return (
             f"Web App:\n"
-            f"{'='*50}\n"
+            f"{'=' * 50}\n"
             f"Name: {app.name}\n"
             f"Resource Group: {resource_group}\n"
             f"Location: {app.location}\n"

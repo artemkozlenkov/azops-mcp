@@ -87,7 +87,7 @@ async def appconfig_show(store_name: str, resource_group: str) -> str:
 
         return (
             f"App Configuration Store:\n"
-            f"{'='*50}\n"
+            f"{'=' * 50}\n"
             f"Name: {store.name}\n"
             f"Location: {store.location}\n"
             f"Resource Group: {resource_group}\n"
@@ -172,7 +172,7 @@ async def appconfig_kv_show(
 
         return (
             f"App Configuration Key-Value:\n"
-            f"{'='*50}\n"
+            f"{'=' * 50}\n"
             f"Key: {setting.key}\n"
             f"Value: {setting.value}\n"
             f"Label: {setting.label or '(no label)'}\n"
@@ -217,7 +217,7 @@ async def appconfig_kv_set(
 
         return (
             f"Key-value set successfully in '{store_name}':\n"
-            f"{'='*50}\n"
+            f"{'=' * 50}\n"
             f"Key: {result.key}\n"
             f"Value: {result.value}\n"
             f"Label: {result.label or '(no label)'}\n"

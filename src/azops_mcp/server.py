@@ -9,6 +9,7 @@ from typing import Any, Dict, Optional
 
 from mcp.server.fastmcp import FastMCP
 
+from . import __version__
 from .config import config
 
 # Import tools by logical category
@@ -83,7 +84,7 @@ async def health_check() -> Dict[str, Any]:
             "status": "healthy",
             "dependencies": deps,
             "timestamp": datetime.now().isoformat(),
-            "version": "1.0.0",
+            "version": __version__,
         }
     except Exception as e:
         return {"status": "unhealthy", "error": str(e)}

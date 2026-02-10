@@ -1,6 +1,6 @@
 [project]
 name = "azops-mcp"
-version = "0.1.0"
+version = "0.1.1"
 description = "Azure Infrastructure MCP Server – manage Azure resources from any MCP-compatible AI assistant"
 readme = "README.md"
 license = {text = "MIT"}

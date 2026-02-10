@@ -1,10 +1,9 @@
 """Unit tests for the configuration module."""
 
 import os
-import pytest
 from unittest.mock import patch
 
-from azops_mcp.config import ServerConfig, config, reload_config
+from azops_mcp.config import ServerConfig, reload_config
 
 
 class TestServerConfig:
@@ -37,6 +36,7 @@ class TestServerConfig:
     def test_validate_returns_empty_list_for_valid_config(self):
         """Test that validate returns empty list for valid config."""
         test_config = ServerConfig()
+        test_config.azure_subscription_id = "00000000-0000-0000-0000-000000000000"
         errors = test_config.validate()
         assert len(errors) == 0
 

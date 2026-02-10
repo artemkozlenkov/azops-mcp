@@ -42,6 +42,8 @@ dependencies = [
     "azure-appconfiguration>=1.6.0",
     # App Service
     "azure-mgmt-web>=7.0.0",
+    # Container Registry
+    "azure-mgmt-containerregistry>=10.0.0",
     # Networking (VNets, subnets, peerings, NSGs)
     "azure-mgmt-network>=25.0.0",
     # Microsoft Graph (Azure AD/Entra ID)

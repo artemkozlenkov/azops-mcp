@@ -2,7 +2,6 @@
 
 import logging
 import re
-from typing import Optional
 
 from ..config import config
 from ..utils.helpers import format_error_message
@@ -35,10 +34,7 @@ async def configure_subscription(subscription_id: str) -> str:
     """
     try:
         if not UUID_PATTERN.match(subscription_id.strip()):
-            return (
-                "Error: Invalid subscription ID format. "
-                "Expected format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-            )
+            return "Error: Invalid subscription ID format. Expected format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 
         set_subscription_id(subscription_id.strip())
 
@@ -48,7 +44,7 @@ async def configure_subscription(subscription_id: str) -> str:
 
             return (
                 f"Subscription configured successfully!\n"
-                f"{'='*50}\n"
+                f"{'=' * 50}\n"
                 f"Subscription ID: {subscription.subscription_id}\n"
                 f"Name: {subscription.display_name}\n"
                 f"State: {subscription.state}\n"
@@ -86,9 +82,7 @@ async def get_auth_status() -> str:
 
         if config.azure_client_id and config.azure_client_secret and config.azure_tenant_id:
             auth_info["method"] = "Service Principal"
-            auth_info["details"].append(
-                f"Client ID: {config.azure_client_id[:8]}...{config.azure_client_id[-4:]}"
-            )
+            auth_info["details"].append(f"Client ID: {config.azure_client_id[:8]}...{config.azure_client_id[-4:]}")
             auth_info["details"].append(f"Tenant ID: {config.azure_tenant_id}")
         else:
             auth_info["method"] = "Azure CLI (az login)"
@@ -121,13 +115,11 @@ async def get_auth_status() -> str:
                 auth_info["details"].append(f"Subscription ID: {subscription_id} (from .env)")
         else:
             auth_info["details"].append("Warning: No subscription ID configured")
-            auth_info["details"].append(
-                "Use azure_set_subscription to set one, or add AZURE_SUBSCRIPTION_ID to .env"
-            )
+            auth_info["details"].append("Use azure_set_subscription to set one, or add AZURE_SUBSCRIPTION_ID to .env")
 
         output = (
             f"Azure Authentication Status:\n"
-            f"{'='*50}\n"
+            f"{'=' * 50}\n"
             f"Method: {auth_info['method']}\n"
             f"Status: {auth_info['status']}\n"
             f"\nDetails:\n"
@@ -163,7 +155,7 @@ async def get_account_info() -> str:
 
         output = (
             f"Azure Account Information:\n"
-            f"{'='*50}\n"
+            f"{'=' * 50}\n"
             f"Subscription ID: {subscription.subscription_id}\n"
             f"Subscription Name: {subscription.display_name}\n"
             f"State: {subscription.state}\n"
@@ -207,17 +199,13 @@ async def list_subscriptions() -> str:
         for sub in subscriptions:
             is_current = " (current)" if sub.subscription_id == current_sub_id else ""
             formatted_subs.append(
-                f"Name: {sub.display_name}{is_current}\n"
-                f"Subscription ID: {sub.subscription_id}\n"
-                f"State: {sub.state}"
+                f"Name: {sub.display_name}{is_current}\nSubscription ID: {sub.subscription_id}\nState: {sub.state}"
             )
 
         if not formatted_subs:
             return "No subscriptions found for the current credentials."
 
-        return f"Azure Subscriptions ({len(formatted_subs)} found):\n\n" + "\n---\n".join(
-            formatted_subs
-        )
+        return f"Azure Subscriptions ({len(formatted_subs)} found):\n\n" + "\n---\n".join(formatted_subs)
 
     except ImportError as e:
         return str(e)
@@ -253,9 +241,7 @@ async def list_locations() -> str:
         if not formatted_locations:
             return "No locations found for the subscription."
 
-        return f"Azure Locations ({len(formatted_locations)} available):\n\n" + "\n---\n".join(
-            formatted_locations
-        )
+        return f"Azure Locations ({len(formatted_locations)} available):\n\n" + "\n---\n".join(formatted_locations)
 
     except ImportError as e:
         return str(e)
@@ -321,7 +307,7 @@ async def get_access_token(
 
         return (
             f"Azure Access Token:\n"
-            f"{'='*50}\n"
+            f"{'=' * 50}\n"
             f"Token (masked): {masked_token}\n"
             f"Token Length: {len(token_value)} chars\n"
             f"Expires On: {expiry.isoformat()}\n"
@@ -373,9 +359,7 @@ async def get_tenant_info() -> str:
         if not formatted_tenants:
             return "No tenants found for the current credentials."
 
-        return f"Azure Tenants ({len(formatted_tenants)} found):\n\n" + "\n---\n".join(
-            formatted_tenants
-        )
+        return f"Azure Tenants ({len(formatted_tenants)} found):\n\n" + "\n---\n".join(formatted_tenants)
 
     except ImportError as e:
         return str(e)

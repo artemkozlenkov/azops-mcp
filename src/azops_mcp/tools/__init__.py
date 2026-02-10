@@ -19,19 +19,21 @@ Modules grouped by Azure service area:
   monitoring           – System metrics & health
 """
 
-from . import subscription
-from . import resource_groups
-from . import compute
-from . import networking
-from . import authorization
-from . import management_groups
-from . import app_configuration
-from . import app_service
-from . import container_registry
-from . import active_directory
-from . import webapp_deployment
-from . import docker
-from . import monitoring
+from . import (
+    active_directory,
+    app_configuration,
+    app_service,
+    authorization,
+    compute,
+    container_registry,
+    docker,
+    management_groups,
+    monitoring,
+    networking,
+    resource_groups,
+    subscription,
+    webapp_deployment,
+)
 
 __all__ = [
     "subscription",

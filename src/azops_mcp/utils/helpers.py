@@ -21,21 +21,21 @@ async def make_api_request(
     timeout: float = 30.0,
 ) -> Optional[Dict[str, Any]]:
     """Make an HTTP request with proper error handling.
-    
+
     Args:
         url: The URL to request
         method: HTTP method (GET, POST, etc.)
         headers: Optional headers dictionary
         json_data: Optional JSON data for POST/PUT requests
         timeout: Request timeout in seconds
-        
+
     Returns:
         Response JSON as dictionary, or None on error
     """
     default_headers = {"User-Agent": "azops-mcp/1.0", "Accept": "application/json"}
     if headers:
         default_headers.update(headers)
-    
+
     try:
         async with httpx.AsyncClient() as client:
             response = await client.request(
@@ -57,11 +57,11 @@ async def make_api_request(
 
 def get_env_var(key: str, default: Optional[str] = None) -> Optional[str]:
     """Get environment variable with optional default.
-    
+
     Args:
         key: Environment variable name
         default: Default value if not found
-        
+
     Returns:
         Environment variable value or default
     """
@@ -70,11 +70,11 @@ def get_env_var(key: str, default: Optional[str] = None) -> Optional[str]:
 
 def format_error_message(error: Exception, context: str = "") -> str:
     """Format an error message for user-friendly display.
-    
+
     Args:
         error: The exception that occurred
         context: Additional context about where the error occurred
-        
+
     Returns:
         Formatted error message
     """

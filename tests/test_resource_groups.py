@@ -1,7 +1,8 @@
 """Tests for resource groups, tags, locks, and activity log tools."""
 
-import pytest
 from unittest.mock import AsyncMock, patch
+
+import pytest
 
 from azops_mcp import server
 

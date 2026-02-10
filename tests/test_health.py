@@ -1,7 +1,6 @@
 """Tests for health check and rate limiting."""
 
 import pytest
-from unittest.mock import AsyncMock, patch
 
 from azops_mcp import server
 

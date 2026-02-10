@@ -1,7 +1,8 @@
 """Tests for system monitoring tools."""
 
-import pytest
 from unittest.mock import AsyncMock, patch
+
+import pytest
 
 from azops_mcp import server
 

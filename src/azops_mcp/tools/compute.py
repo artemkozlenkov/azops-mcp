@@ -1,7 +1,7 @@
 """VM and VMSS management tools."""
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from ..utils.helpers import format_error_message
 from ._clients import (
@@ -13,9 +13,7 @@ from ._clients import (
 logger = logging.getLogger(__name__)
 
 
-async def list_resources(
-    resource_group: str, resource_type: str = "all"
-) -> str:
+async def list_resources(resource_group: str, resource_type: str = "all") -> str:
     """List resources in a resource group.
 
     Args:
@@ -39,49 +37,47 @@ async def list_resources(
                 compute_client = _get_compute_client()
                 vms = compute_client.virtual_machines.list(resource_group)
                 for vm in vms:
-                    instance_view = compute_client.virtual_machines.instance_view(
-                        resource_group, vm.name
-                    )
+                    instance_view = compute_client.virtual_machines.instance_view(resource_group, vm.name)
                     power_state = "unknown"
                     for status in instance_view.statuses:
                         if status.code.startswith("PowerState/"):
                             power_state = status.code.replace("PowerState/", "")
                             break
-                    resources.append({
-                        "type": "Virtual Machine",
-                        "name": vm.name,
-                        "id": vm.id,
-                        "location": vm.location,
-                        "status": power_state,
-                        "vm_size": vm.hardware_profile.vm_size if vm.hardware_profile else "N/A",
-                    })
+                    resources.append(
+                        {
+                            "type": "Virtual Machine",
+                            "name": vm.name,
+                            "id": vm.id,
+                            "location": vm.location,
+                            "status": power_state,
+                            "vm_size": vm.hardware_profile.vm_size if vm.hardware_profile else "N/A",
+                        }
+                    )
             except Exception as e:
                 logger.warning("Failed to list VMs: %s", e)
 
         if resource_type in ["all", "storage"]:
             try:
                 storage_client = _get_storage_client()
-                accounts = storage_client.storage_accounts.list_by_resource_group(
-                    resource_group
-                )
+                accounts = storage_client.storage_accounts.list_by_resource_group(resource_group)
                 for account in accounts:
-                    resources.append({
-                        "type": "Storage Account",
-                        "name": account.name,
-                        "id": account.id,
-                        "location": account.location,
-                        "status": account.provisioning_state,
-                        "kind": account.kind,
-                    })
+                    resources.append(
+                        {
+                            "type": "Storage Account",
+                            "name": account.name,
+                            "id": account.id,
+                            "location": account.location,
+                            "status": account.provisioning_state,
+                            "kind": account.kind,
+                        }
+                    )
             except Exception as e:
                 logger.warning("Failed to list storage accounts: %s", e)
 
         if resource_type in ["all", "webapp", "sql"]:
             try:
                 resource_client = _get_resource_client()
-                all_resources = resource_client.resources.list_by_resource_group(
-                    resource_group
-                )
+                all_resources = resource_client.resources.list_by_resource_group(resource_group)
                 existing_ids = {r["id"] for r in resources}
                 type_filters = {
                     "webapp": "Microsoft.Web",
@@ -94,13 +90,15 @@ async def list_resources(
                         continue
                     if filter_prefix and (not resource.type or not resource.type.startswith(filter_prefix)):
                         continue
-                    resources.append({
-                        "type": resource.type.split("/")[-1] if resource.type else "Unknown",
-                        "name": resource.name,
-                        "id": resource.id,
-                        "location": resource.location,
-                        "status": "available",
-                    })
+                    resources.append(
+                        {
+                            "type": resource.type.split("/")[-1] if resource.type else "Unknown",
+                            "name": resource.name,
+                            "id": resource.id,
+                            "location": resource.location,
+                            "status": "available",
+                        }
+                    )
             except Exception as e:
                 logger.warning("Failed to list resources: %s", e)
 
@@ -150,9 +148,7 @@ async def get_resource_status(
         if resource_type == "vm":
             compute_client = _get_compute_client()
             vm = compute_client.virtual_machines.get(resource_group, resource_name)
-            instance_view = compute_client.virtual_machines.instance_view(
-                resource_group, resource_name
-            )
+            instance_view = compute_client.virtual_machines.instance_view(resource_group, resource_name)
             power_state = "unknown"
             provisioning_state = "unknown"
             for status in instance_view.statuses:
@@ -174,9 +170,7 @@ async def get_resource_status(
 
         elif resource_type == "storage":
             storage_client = _get_storage_client()
-            account = storage_client.storage_accounts.get_properties(
-                resource_group, resource_name
-            )
+            account = storage_client.storage_accounts.get_properties(resource_group, resource_name)
             return (
                 f"Azure Storage Account Status:\n"
                 f"Name: {account.name}\n"
@@ -198,9 +192,7 @@ async def get_resource_status(
         return format_error_message(e, f"Failed to get status for {resource_name}")
 
 
-async def manage_vm(
-    resource_group: str, vm_name: str, action: str
-) -> str:
+async def manage_vm(resource_group: str, vm_name: str, action: str) -> str:
     """Start, stop, restart, or deallocate a VM.
 
     Args:
@@ -221,27 +213,19 @@ async def manage_vm(
         compute_client = _get_compute_client()
 
         if action == "start":
-            poller = compute_client.virtual_machines.begin_start(
-                resource_group, vm_name
-            )
+            poller = compute_client.virtual_machines.begin_start(resource_group, vm_name)
             poller.result()
             return f"VM '{vm_name}' started successfully."
         elif action == "stop":
-            poller = compute_client.virtual_machines.begin_power_off(
-                resource_group, vm_name
-            )
+            poller = compute_client.virtual_machines.begin_power_off(resource_group, vm_name)
             poller.result()
             return f"VM '{vm_name}' stopped successfully."
         elif action == "restart":
-            poller = compute_client.virtual_machines.begin_restart(
-                resource_group, vm_name
-            )
+            poller = compute_client.virtual_machines.begin_restart(resource_group, vm_name)
             poller.result()
             return f"VM '{vm_name}' restarted successfully."
         elif action == "deallocate":
-            poller = compute_client.virtual_machines.begin_deallocate(
-                resource_group, vm_name
-            )
+            poller = compute_client.virtual_machines.begin_deallocate(resource_group, vm_name)
             poller.result()
             return f"VM '{vm_name}' deallocated successfully."
 
@@ -252,9 +236,7 @@ async def manage_vm(
         return format_error_message(e, f"Failed to {action} VM {vm_name}")
 
 
-async def scale_vmss(
-    resource_group: str, vmss_name: str, capacity: int
-) -> str:
+async def scale_vmss(resource_group: str, vmss_name: str, capacity: int) -> str:
     """Scale a Virtual Machine Scale Set.
 
     Args:
@@ -270,15 +252,11 @@ async def scale_vmss(
 
     try:
         compute_client = _get_compute_client()
-        vmss = compute_client.virtual_machine_scale_sets.get(
-            resource_group, vmss_name
-        )
+        vmss = compute_client.virtual_machine_scale_sets.get(resource_group, vmss_name)
         current_capacity = vmss.sku.capacity if vmss.sku else 0
 
         vmss.sku.capacity = capacity
-        poller = compute_client.virtual_machine_scale_sets.begin_create_or_update(
-            resource_group, vmss_name, vmss
-        )
+        poller = compute_client.virtual_machine_scale_sets.begin_create_or_update(resource_group, vmss_name, vmss)
         poller.result()
 
         return (

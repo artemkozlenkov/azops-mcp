@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""Azure Infrastructure MCP Server - Core platform tools for Azure management.
-"""
+"""Azure Infrastructure MCP Server - Core platform tools for Azure management."""
 
 import logging
 import signal
@@ -14,19 +13,19 @@ from .config import config
 
 # Import tools by logical category
 from .tools import (
-    subscription,
-    resource_groups,
-    compute,
-    networking,
-    authorization,
-    management_groups,
+    active_directory,
     app_configuration,
     app_service,
+    authorization,
+    compute,
     container_registry,
-    active_directory,
-    webapp_deployment,
     docker,
+    management_groups,
     monitoring,
+    networking,
+    resource_groups,
+    subscription,
+    webapp_deployment,
 )
 
 # ---------------------------------------------------------------------------
@@ -536,7 +535,9 @@ async def appconfig_show(store_name: str, resource_group: str) -> str:
 
 
 @mcp.tool()
-async def appconfig_kv_list(store_name: str, resource_group: str = "", key_filter: str = "*", label_filter: str = "") -> str:
+async def appconfig_kv_list(
+    store_name: str, resource_group: str = "", key_filter: str = "*", label_filter: str = ""
+) -> str:
     """List key-values in an App Configuration store.
 
     Args:
@@ -576,7 +577,9 @@ async def appconfig_kv_show(store_name: str, key: str, resource_group: str = "",
 
 
 @mcp.tool()
-async def appconfig_kv_set(store_name: str, key: str, value: str, resource_group: str = "", label: str = "", content_type: str = "") -> str:
+async def appconfig_kv_set(
+    store_name: str, key: str, value: str, resource_group: str = "", label: str = "", content_type: str = ""
+) -> str:
     """Set a key-value in an App Configuration store.
 
     Args:
@@ -1141,11 +1144,20 @@ async def acr_create_task(
         platform_architecture: Platform architecture (default: amd64)
         platform_variant: Platform variant (optional)
     """
-    logger.info("acr_create_task: %s/%s/%s os=%s arch=%s", resource_group, registry_name, task_name, platform_os, platform_architecture)
+    logger.info(
+        "acr_create_task: %s/%s/%s os=%s arch=%s",
+        resource_group,
+        registry_name,
+        task_name,
+        platform_os,
+        platform_architecture,
+    )
     if not registry_name or not resource_group or not task_name:
         return "Error: registry_name, resource_group, and task_name are required"
     try:
-        return await container_registry.acr_create_task(resource_group, registry_name, task_name, platform_os, platform_architecture, platform_variant)
+        return await container_registry.acr_create_task(
+            resource_group, registry_name, task_name, platform_os, platform_architecture, platform_variant
+        )
     except Exception as e:
         logger.error("acr_create_task failed: %s", e)
         return f"Error: {e}"
@@ -1352,7 +1364,9 @@ async def aad_create_user(
     """
     logger.info("aad_create_user: %s (%s)", display_name, user_principal_name)
     try:
-        return await active_directory.create_user(display_name, user_principal_name, password, mail_nick_name, department, job_title)
+        return await active_directory.create_user(
+            display_name, user_principal_name, password, mail_nick_name, department, job_title
+        )
     except Exception as e:
         logger.error("aad_create_user failed: %s", e)
         return f"Error: {e}"
@@ -1494,12 +1508,25 @@ async def webapp_create_for_container(
     logger.info("webapp_create_for_container: %s/%s", resource_group, name)
     try:
         import json
+
         env_vars = json.loads(env_variables) if env_variables else None
         return await webapp_deployment.webapp_create_for_container(
-            name, resource_group, plan_name, plan_sku, plan_tier, location,
-            image, registry_url, registry_username, registry_password,
-            os_type, multi_container, startup_command, env_vars,
-            vnet_subnet_id, assign_identity
+            name,
+            resource_group,
+            plan_name,
+            plan_sku,
+            plan_tier,
+            location,
+            image,
+            registry_url,
+            registry_username,
+            registry_password,
+            os_type,
+            multi_container,
+            startup_command,
+            env_vars,
+            vnet_subnet_id,
+            assign_identity,
         )
     except Exception as e:
         logger.error("webapp_create_for_container failed: %s", e)
@@ -1673,9 +1700,7 @@ async def create_role_assignment(
     if not principal_id:
         return "Error: principal_id is required"
     try:
-        return await authorization.create_role_assignment(
-            principal_id, role_definition_name, resource_group, scope
-        )
+        return await authorization.create_role_assignment(principal_id, role_definition_name, resource_group, scope)
     except Exception as e:
         logger.error("create_role_assignment failed: %s", e)
         return f"Error: {e}"
@@ -1832,6 +1857,7 @@ async def check_rate_limit(key: str) -> bool:
         return True
 
     import time
+
     now = time.time()
     window = 60  # 1 minute window
 
@@ -1859,13 +1885,15 @@ def main() -> None:
 
     def signal_handler(signum: int, frame: Optional[object]) -> None:
         logger.info("Shutting down (signal %d)...", signum)
-        mcp.stop()
+        sys.exit(0)
 
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
     try:
         mcp.run(transport="stdio")
+    except SystemExit:
+        pass
     except Exception as e:
         logger.error("Server error: %s", e)
         sys.exit(1)

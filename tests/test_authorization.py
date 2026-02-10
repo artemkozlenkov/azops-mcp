@@ -1,7 +1,8 @@
 """Tests for RBAC authorization tools."""
 
-import pytest
 from unittest.mock import AsyncMock, patch
+
+import pytest
 
 from azops_mcp import server
 
@@ -75,7 +76,9 @@ class TestListRoleAssignmentsForPrincipal:
     @pytest.mark.asyncio
     async def test_list_assignments_success(self):
         """Test list_role_assignments_for_principal returns assignments."""
-        with patch.object(server.authorization, "list_role_assignments_for_principal", new_callable=AsyncMock) as mock_list:
+        with patch.object(
+            server.authorization, "list_role_assignments_for_principal", new_callable=AsyncMock
+        ) as mock_list:
             mock_list.return_value = "Role Assignments:\n- Contributor on my-rg"
             result = await server.list_role_assignments_for_principal("principal-id")
 

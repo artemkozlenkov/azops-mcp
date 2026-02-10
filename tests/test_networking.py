@@ -1,7 +1,8 @@
 """Tests for networking tools (VNets, subnets, peerings)."""
 
-import pytest
 from unittest.mock import AsyncMock, patch
+
+import pytest
 
 from azops_mcp import server
 

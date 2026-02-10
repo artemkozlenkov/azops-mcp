@@ -88,11 +88,11 @@ def _get_azure_credential():
                     AzureCliCredential(),
                     ManagedIdentityCredential(),
                 )
-        except ImportError:
+        except ImportError as e:
             raise ImportError(
                 "Azure SDK not installed. Run: pip install azure-identity azure-mgmt-compute "
                 "azure-mgmt-resource azure-mgmt-storage"
-            )
+            ) from e
     return _azure_credential
 
 
@@ -132,8 +132,8 @@ def _get_compute_client():
                 credential=_get_azure_credential(),
                 subscription_id=subscription_id,
             )
-        except ImportError:
-            raise ImportError("Azure Compute SDK not installed. Run: pip install azure-mgmt-compute")
+        except ImportError as e:
+            raise ImportError("Azure Compute SDK not installed. Run: pip install azure-mgmt-compute") from e
     return _compute_client
 
 
@@ -154,8 +154,8 @@ def _get_resource_client():
                 credential=_get_azure_credential(),
                 subscription_id=subscription_id,
             )
-        except ImportError:
-            raise ImportError("Azure Resource SDK not installed. Run: pip install azure-mgmt-resource")
+        except ImportError as e:
+            raise ImportError("Azure Resource SDK not installed. Run: pip install azure-mgmt-resource") from e
     return _resource_client
 
 
@@ -176,8 +176,8 @@ def _get_storage_client():
                 credential=_get_azure_credential(),
                 subscription_id=subscription_id,
             )
-        except ImportError:
-            raise ImportError("Azure Storage SDK not installed. Run: pip install azure-mgmt-storage")
+        except ImportError as e:
+            raise ImportError("Azure Storage SDK not installed. Run: pip install azure-mgmt-storage") from e
     return _storage_client
 
 
@@ -191,10 +191,8 @@ def _get_subscription_client():
             _subscription_client = SubscriptionClient(
                 credential=_get_azure_credential(),
             )
-        except ImportError:
-            raise ImportError(
-                "Azure Subscription SDK not installed. Run: pip install azure-mgmt-subscription"
-            )
+        except ImportError as e:
+            raise ImportError("Azure Subscription SDK not installed. Run: pip install azure-mgmt-subscription") from e
     return _subscription_client
 
 
@@ -212,8 +210,8 @@ def _get_web_client():
                 credential=_get_azure_credential(),
                 subscription_id=subscription_id,
             )
-        except ImportError:
-            raise ImportError("Azure Web SDK not installed. Run: pip install azure-mgmt-web")
+        except ImportError as e:
+            raise ImportError("Azure Web SDK not installed. Run: pip install azure-mgmt-web") from e
     return _web_client
 
 
@@ -231,8 +229,8 @@ def _get_network_client():
                 credential=_get_azure_credential(),
                 subscription_id=subscription_id,
             )
-        except ImportError:
-            raise ImportError("Azure Network SDK not installed. Run: pip install azure-mgmt-network")
+        except ImportError as e:
+            raise ImportError("Azure Network SDK not installed. Run: pip install azure-mgmt-network") from e
     return _network_client
 
 
@@ -250,10 +248,8 @@ def _get_authorization_client():
                 credential=_get_azure_credential(),
                 subscription_id=subscription_id,
             )
-        except ImportError:
-            raise ImportError(
-                "Azure Authorization SDK not installed. Run: pip install azure-mgmt-authorization"
-            )
+        except ImportError as e:
+            raise ImportError("Azure Authorization SDK not installed. Run: pip install azure-mgmt-authorization") from e
     return _authorization_client
 
 
@@ -267,10 +263,10 @@ def _get_management_group_client():
             _management_group_client = ManagementGroupsAPI(
                 credential=_get_azure_credential(),
             )
-        except ImportError:
+        except ImportError as e:
             raise ImportError(
                 "Azure Management Groups SDK not installed. Run: pip install azure-mgmt-managementgroups"
-            )
+            ) from e
     return _management_group_client
 
 
@@ -288,10 +284,10 @@ def _get_appconfig_mgmt_client():
                 credential=_get_azure_credential(),
                 subscription_id=subscription_id,
             )
-        except ImportError:
+        except ImportError as e:
             raise ImportError(
                 "Azure App Configuration SDK not installed. Run: pip install azure-mgmt-appconfiguration"
-            )
+            ) from e
     return _appconfig_mgmt_client
 
 
@@ -306,8 +302,8 @@ def _get_appconfig_data_client(endpoint: str):
                 base_url=endpoint,
                 credential=_get_azure_credential(),
             )
-        except ImportError:
+        except ImportError as e:
             raise ImportError(
                 "Azure App Configuration data SDK not installed. Run: pip install azure-appconfiguration"
-            )
+            ) from e
     return _appconfig_data_clients[endpoint]

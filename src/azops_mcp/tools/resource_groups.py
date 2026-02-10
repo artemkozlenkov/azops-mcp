@@ -44,9 +44,7 @@ async def list_resource_groups() -> str:
         return format_error_message(e, "Failed to list resource groups")
 
 
-async def create_resource_group(
-    name: str, location: str, tags: Optional[Dict[str, str]] = None
-) -> str:
+async def create_resource_group(name: str, location: str, tags: Optional[Dict[str, str]] = None) -> str:
     """Create or update a resource group.
 
     Args:
@@ -68,7 +66,7 @@ async def create_resource_group(
 
         return (
             f"Resource group created successfully!\n"
-            f"{'='*50}\n"
+            f"{'=' * 50}\n"
             f"Name: {result.name}\n"
             f"Location: {result.location}\n"
             f"Provisioning State: {result.properties.provisioning_state if result.properties else 'N/A'}\n"
@@ -128,9 +126,7 @@ async def list_tags(resource_group: Optional[str] = None) -> str:
             formatted = []
             for tag in tags_list:
                 values = [v.tag_value for v in (tag.values or [])][:5]
-                formatted.append(
-                    f"{tag.tag_name}: {', '.join(values) if values else '(no values)'}"
-                )
+                formatted.append(f"{tag.tag_name}: {', '.join(values) if values else '(no values)'}")
             if not formatted:
                 return "No tags found in subscription."
             return f"Tags in Subscription ({len(formatted)} found):\n" + "\n".join(formatted[:20])
@@ -142,9 +138,7 @@ async def list_tags(resource_group: Optional[str] = None) -> str:
         return format_error_message(e, "Failed to list tags")
 
 
-async def update_resource_group_tags(
-    resource_group: str, tags: Dict[str, str], merge: bool = True
-) -> str:
+async def update_resource_group_tags(resource_group: str, tags: Dict[str, str], merge: bool = True) -> str:
     """Merge or replace tags on a resource group.
 
     Args:
@@ -191,19 +185,13 @@ async def list_resource_locks(resource_group: Optional[str] = None) -> str:
         resource_client = _get_resource_client()
 
         if resource_group:
-            locks = resource_client.management_locks.list_at_resource_group_level(
-                resource_group
-            )
+            locks = resource_client.management_locks.list_at_resource_group_level(resource_group)
         else:
             locks = resource_client.management_locks.list_at_subscription_level()
 
         formatted = []
         for lock in locks:
-            formatted.append(
-                f"Name: {lock.name}\n"
-                f"Level: {lock.level}\n"
-                f"Notes: {lock.notes or 'N/A'}"
-            )
+            formatted.append(f"Name: {lock.name}\nLevel: {lock.level}\nNotes: {lock.notes or 'N/A'}")
 
         if not formatted:
             return "No resource locks found."
@@ -269,9 +257,7 @@ async def delete_resource_lock(resource_group: str, lock_name: str) -> str:
     """
     try:
         resource_client = _get_resource_client()
-        resource_client.management_locks.delete_at_resource_group_level(
-            resource_group, lock_name
-        )
+        resource_client.management_locks.delete_at_resource_group_level(resource_group, lock_name)
         return f"Resource lock '{lock_name}' deleted from '{resource_group}'."
 
     except ImportError as e:
@@ -330,10 +316,7 @@ async def get_activity_log(resource_group: Optional[str] = None, days: int = 1) 
 
         if not formatted:
             return f"No activity log entries found in the last {days} day(s)."
-        return (
-            f"Activity Log (last {days} day(s), showing {len(formatted)} entries):\n\n"
-            + "\n---\n".join(formatted)
-        )
+        return f"Activity Log (last {days} day(s), showing {len(formatted)} entries):\n\n" + "\n---\n".join(formatted)
 
     except Exception as e:
         logger.error("get_activity_log failed: %s", e)

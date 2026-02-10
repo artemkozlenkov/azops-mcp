@@ -1885,13 +1885,15 @@ def main() -> None:
 
     def signal_handler(signum: int, frame: Optional[object]) -> None:
         logger.info("Shutting down (signal %d)...", signum)
-        mcp.stop()
+        sys.exit(0)
 
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
     try:
         mcp.run(transport="stdio")
+    except SystemExit:
+        pass
     except Exception as e:
         logger.error("Server error: %s", e)
         sys.exit(1)

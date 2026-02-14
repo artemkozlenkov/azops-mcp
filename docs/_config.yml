@@ -1,8 +1,8 @@
 title: azops-mcp
 description: Azure Infrastructure MCP Server — manage Azure from AI assistants
 remote_theme: just-the-docs/just-the-docs@v0.10.0
-url: "https://artemkozlenkov.github.io"
-baseurl: "/azops-mcp"
+url: "https://azops.softawebit.com"
+baseurl: ""
 
 color_scheme: dark
 

@@ -26,35 +26,86 @@ A Model Context Protocol (MCP) server for managing Azure infrastructure directly
 
 - Python 3.10+
 - Azure CLI installed and logged in (`az login`)
-- [uv](https://astral.sh/uv) package manager
+- [uv](https://astral.sh/uv) package manager (recommended) — or plain pip
 
 ### 2. Install
 
+**Option A — Install from PyPI (recommended):**
+
 ```bash
-git clone <repo-url> azops-mcp
+pip install azops-mcp
+# or
+uv pip install azops-mcp
+```
+
+**Option B — Run with uvx (zero-install):**
+
+```bash
+uvx azops-mcp
+```
+
+`uvx` downloads the package into a cached, isolated environment and runs the server — nothing is installed permanently.
+
+**Option C — From source:**
+
+```bash
+git clone https://github.com/artemkozlenkov/azops-mcp.git
 cd azops-mcp
 ./quickstart.sh
 ```
 
-The script will:
-- Create a virtual environment with Python 3.12
-- Install all dependencies (including Azure SDKs)
-- Show configuration for Claude Desktop and Cursor
-
 ### 3. Configure Your AI Client
 
-**Claude Desktop** — add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS):
+**Claude Desktop** — add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+
+> **Important:** Claude Desktop does **not** inherit your shell's `PATH`. You must use the **full absolute path** to `uvx` (or any other command). Find it with `which uvx`.
+
+Using **uvx** (recommended — no install required):
 
 ```json
 {
   "mcpServers": {
     "azops-mcp": {
-      "command": "uv",
+      "command": "/Users/YOUR_USERNAME/.local/bin/uvx",
+      "args": ["azops-mcp"]
+    }
+  }
+}
+```
+
+Using a **pip-installed** package:
+
+```json
+{
+  "mcpServers": {
+    "azops-mcp": {
+      "command": "/Users/YOUR_USERNAME/.local/bin/azops-mcp"
+    }
+  }
+}
+```
+
+Using a **local clone** (development):
+
+```json
+{
+  "mcpServers": {
+    "azops-mcp": {
+      "command": "/Users/YOUR_USERNAME/.local/bin/uv",
       "args": ["--directory", "/full/path/to/azops-mcp", "run", "python", "-m", "azops_mcp"]
     }
   }
 }
 ```
+
+<details>
+<summary>Troubleshooting: "Failed to spawn process: No such file or directory"</summary>
+
+This error in `~/Library/Logs/Claude/mcp-server-azops-mcp.log` means Claude Desktop cannot find the binary. Claude Desktop only searches system paths (`/usr/local/bin`, `/opt/homebrew/bin`, `/usr/bin`, `/bin`) — it does **not** search `~/.local/bin` or paths from your shell profile.
+
+**Fix:** Replace `"command": "uvx"` with the full path from `which uvx` (e.g. `/Users/yourname/.local/bin/uvx`).
+
+</details>
 
 **Cursor** — add to `~/.cursor/mcp.json`:
 
@@ -62,8 +113,77 @@ The script will:
 {
   "mcpServers": {
     "azops-mcp": {
-      "command": "uv",
-      "args": ["--directory", "/full/path/to/azops-mcp", "run", "python", "-m", "azops_mcp"]
+      "command": "uvx",
+      "args": ["azops-mcp"]
+    }
+  }
+}
+```
+
+**Windsurf** — add to `~/.codeium/windsurf/mcp_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "azops-mcp": {
+      "command": "uvx",
+      "args": ["azops-mcp"]
+    }
+  }
+}
+```
+
+**VS Code (GitHub Copilot)** — add to `.vscode/mcp.json` in your workspace:
+
+```json
+{
+  "servers": {
+    "azops-mcp": {
+      "command": "uvx",
+      "args": ["azops-mcp"]
+    }
+  }
+}
+```
+
+**Zed** — add to your Zed settings file:
+
+```json
+{
+  "context_servers": {
+    "azops-mcp": {
+      "command": {
+        "path": "uvx",
+        "args": ["azops-mcp"]
+      }
+    }
+  }
+}
+```
+
+**Continue (VS Code / JetBrains)** — add to `~/.continue/config.yaml`:
+
+```yaml
+mcpServers:
+  - name: azops-mcp
+    command: uvx
+    args:
+      - azops-mcp
+```
+
+> **Note:** Cursor, Windsurf, VS Code, and Zed inherit your shell's `PATH`, so `uvx` usually works as-is. If not, use the full path from `which uvx`. See the [full docs](https://azops.softawebit.com/getting-started#connect-to-your-ai-client) for details.
+
+To pass environment variables (e.g. Azure credentials), add an `"env"` key:
+
+```json
+{
+  "mcpServers": {
+    "azops-mcp": {
+      "command": "uvx",
+      "args": ["azops-mcp"],
+      "env": {
+        "AZURE_SUBSCRIPTION_ID": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+      }
     }
   }
 }
@@ -88,7 +208,7 @@ User: What VMs are running in my dev resource group?
 | 2 | **Azure CLI** | After `az login` (recommended for development) |
 | 3 | **Managed Identity** | When running in Azure |
 
-See the [Authentication docs](https://artemkozlenkov.github.io/azops-mcp/authentication) for the full walkthrough.
+See the [Authentication docs](https://azops.softawebit.com/authentication) for the full walkthrough.
 
 ## Available Tools (90+)
 
@@ -123,7 +243,7 @@ docker compose build
 docker compose run --rm mcp-server
 ```
 
-See the [Docker docs](https://artemkozlenkov.github.io/azops-mcp/docker) for full instructions.
+See the [Docker docs](https://azops.softawebit.com/docker) for full instructions.
 
 ## Project Structure
 
@@ -203,14 +323,14 @@ uv run python -m azops_mcp
 
 ## Documentation
 
-Full documentation is available at [artemkozlenkov.github.io/azops-mcp](https://artemkozlenkov.github.io/azops-mcp/).
+Full documentation is available at [azops.softawebit.com](https://azops.softawebit.com/).
 
-- [Getting Started](https://artemkozlenkov.github.io/azops-mcp/getting-started)
-- [Architecture](https://artemkozlenkov.github.io/azops-mcp/architecture)
-- [Tools Reference](https://artemkozlenkov.github.io/azops-mcp/tools-reference)
-- [Authentication](https://artemkozlenkov.github.io/azops-mcp/authentication)
-- [Configuration](https://artemkozlenkov.github.io/azops-mcp/configuration)
-- [Docker](https://artemkozlenkov.github.io/azops-mcp/docker)
+- [Getting Started](https://azops.softawebit.com/getting-started)
+- [Architecture](https://azops.softawebit.com/architecture)
+- [Tools Reference](https://azops.softawebit.com/tools-reference)
+- [Authentication](https://azops.softawebit.com/authentication)
+- [Configuration](https://azops.softawebit.com/configuration)
+- [Docker](https://azops.softawebit.com/docker)
 
 ## License
 

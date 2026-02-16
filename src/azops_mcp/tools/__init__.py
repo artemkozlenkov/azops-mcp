@@ -17,6 +17,7 @@ Modules grouped by Azure service area:
   webapp_deployment    – Web App for Containers deployment
   docker               – Local Docker container runtime
   monitoring           – System metrics & health
+  billing              – Azure Billing and Cost Management
 """
 
 from . import (
@@ -24,6 +25,7 @@ from . import (
     app_configuration,
     app_service,
     authorization,
+    billing,
     compute,
     container_registry,
     docker,
@@ -49,4 +51,5 @@ __all__ = [
     "webapp_deployment",
     "docker",
     "monitoring",
+    "billing",
 ]

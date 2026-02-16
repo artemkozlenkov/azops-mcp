@@ -14,6 +14,23 @@ nav_order: 1
 
 ---
 
+## Install
+
+```bash
+# Run instantly with uvx (nothing to install)
+uvx azops-mcp
+
+# Or install from PyPI
+pip install azops-mcp
+```
+
+Then point your AI client at the server — see [Getting Started](/azops-mcp/getting-started#connect-to-your-ai-client) for Claude Desktop, Cursor, and other clients.
+
+{: .important }
+> **Claude Desktop users:** You must use the **full absolute path** to `uvx` in your config (e.g. `/Users/yourname/.local/bin/uvx`). Claude Desktop does not inherit your shell's `PATH`. Run `which uvx` to find the correct path. See [Connect to Your AI Client](/azops-mcp/getting-started#connect-to-your-ai-client) for details.
+
+---
+
 ## What is azops-mcp?
 
 `azops-mcp` is a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that exposes Azure management operations as tools that AI assistants can invoke. Instead of switching between the Azure Portal, CLI, and your editor, you talk to your AI assistant in natural language and it calls the right Azure SDK operations behind the scenes.

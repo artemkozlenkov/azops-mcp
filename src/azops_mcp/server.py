@@ -18,6 +18,7 @@ from .tools import (
     app_configuration,
     app_service,
     authorization,
+    billing,
     compute,
     container_registry,
     docker,
@@ -1837,6 +1838,99 @@ async def get_infrastructure_status() -> str:
         return await monitoring.get_infrastructure_status()
     except Exception as e:
         logger.error("get_infrastructure_status failed: %s", e)
+        return f"Error: {e}"
+
+
+# -- 20. Billing & Cost Management ---------------------------------------------
+
+
+@mcp.tool()
+async def billing_usage_details(start_date: str, end_date: str, resource_group: str = "") -> str:
+    """Get Azure usage details for a subscription.
+
+    Args:
+        start_date: Start date in YYYY-MM-DD format
+        end_date: End date in YYYY-MM-DD format
+        resource_group: Optional resource group to filter by
+    """
+    logger.info("billing_usage_details: %s to %s, rg=%s", start_date, end_date, resource_group or "all")
+    try:
+        rg = resource_group if resource_group else None
+        return await billing.get_usage_details(start_date, end_date, rg)
+    except Exception as e:
+        logger.error("billing_usage_details failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def billing_budgets(budget_name: str = "") -> str:
+    """List Azure budgets or get a specific budget.
+
+    Args:
+        budget_name: Specific budget name to retrieve (optional)
+    """
+    logger.info("billing_budgets: %s", budget_name or "all")
+    try:
+        name = budget_name if budget_name else None
+        return await billing.list_budgets(name)
+    except Exception as e:
+        logger.error("billing_budgets failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def billing_reservations() -> str:
+    """Get Azure reservation details."""
+    logger.info("billing_reservations called")
+    try:
+        return await billing.get_reservation_details()
+    except Exception as e:
+        logger.error("billing_reservations failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def billing_estimate_cost(resource_name: str = "", resource_type: str = "") -> str:
+    """Estimate cost for specific resources or types.
+
+    Args:
+        resource_name: Specific resource name to estimate cost for
+        resource_type: Resource type (e.g. 'Microsoft.Compute/virtualMachines')
+    """
+    logger.info("billing_estimate_cost: name=%s, type=%s", resource_name or "N/A", resource_type or "N/A")
+    try:
+        rn = resource_name if resource_name else None
+        rt = resource_type if resource_type else None
+        return await billing.estimate_cost(rn, rt)
+    except Exception as e:
+        logger.error("billing_estimate_cost failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def billing_periods() -> str:
+    """List available Azure billing periods."""
+    logger.info("billing_periods called")
+    try:
+        return await billing.get_billing_periods()
+    except Exception as e:
+        logger.error("billing_periods failed: %s", e)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def billing_charges(start_date: str, end_date: str) -> str:
+    """List charges for a subscription.
+
+    Args:
+        start_date: Start date in YYYY-MM-DD format
+        end_date: End date in YYYY-MM-DD format
+    """
+    logger.info("billing_charges: %s to %s", start_date, end_date)
+    try:
+        return await billing.list_charges(start_date, end_date)
+    except Exception as e:
+        logger.error("billing_charges failed: %s", e)
         return f"Error: {e}"
 
 

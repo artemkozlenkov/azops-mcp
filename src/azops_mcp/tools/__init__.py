@@ -25,6 +25,7 @@ from . import (
     app_configuration,
     app_service,
     authorization,
+    billing,
     compute,
     container_registry,
     docker,
@@ -34,7 +35,6 @@ from . import (
     resource_groups,
     subscription,
     webapp_deployment,
-    billing,
 )
 
 __all__ = [

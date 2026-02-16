@@ -1,13 +1,10 @@
 """Azure Billing and Cost Management tools."""
 
 import logging
-from typing import List, Dict, Any, Optional
 
-from ..config import config
 from ..utils.helpers import format_error_message
 from ._clients import (
     _get_azure_credential,
-    _get_subscription_client,
     get_subscription_id,
 )
 
@@ -159,8 +156,6 @@ async def list_budgets(budget_name: str = None) -> str:
         Formatted budgets report
     """
     try:
-        from azure.mgmt.consumption.models import Budget
-
         consumption_client = _get_consumption_client()
 
         if budget_name:
@@ -226,8 +221,6 @@ async def get_reservation_details() -> str:
         Formatted reservation details report
     """
     try:
-        from azure.mgmt.consumption.models import ReservationSummary, ReservationDetail
-
         consumption_client = _get_consumption_client()
 
         # Get reservations summary
@@ -328,7 +321,7 @@ async def estimate_cost(resource_name: str = None, resource_type: str = None) ->
         Formatted cost estimate report
     """
     try:
-        consumption_client = _get_consumption_client()
+        _get_consumption_client()  # validate client availability
 
         # For demonstration, we'll show how this would work
         return (
@@ -358,7 +351,7 @@ async def get_billing_periods() -> str:
         Formatted billing periods report
     """
     try:
-        billing_client = _get_billing_client()
+        _get_billing_client()  # validate client availability
 
         # Get billing periods - this might not be available in all subscriptions
         try:
@@ -386,8 +379,8 @@ async def get_billing_periods() -> str:
                 )
 
             formatted_output += (
-                f"Note: Detailed billing period information may require\n"
-                f"billing account permissions. This shows a sample structure."
+                "Note: Detailed billing period information may require\n"
+                "billing account permissions. This shows a sample structure."
             )
 
         except Exception as e:
@@ -423,7 +416,7 @@ async def list_charges(start_date: str, end_date: str) -> str:
         Formatted charges report
     """
     try:
-        consumption_client = _get_consumption_client()
+        _get_consumption_client()  # validate client availability
 
         # This is a simplified version as the full API might require special permissions
         return (
